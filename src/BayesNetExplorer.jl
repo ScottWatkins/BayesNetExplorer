@@ -6,7 +6,7 @@ using Plots, GraphRecipes, RCall, Suppressor
 using LinearAlgebra, Impute
 
 export format_file
-export impute_file
+export impute_dataframe
 export bne
 export RRcalculator
 export plot_network
