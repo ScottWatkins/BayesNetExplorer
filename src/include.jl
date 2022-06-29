@@ -1,16 +1,4 @@
-module BayesNetExplorer
-
-using CSV, DelimitedFiles, DataFrames
-using StatsBase, Statistics, Random, Distributions, Combinatorics
-using Plots, GraphRecipes, RCall, Suppressor
-using LinearAlgebra, Impute
-
-export format_file
-export impute_file
-export bne
-export RRcalculator
-export plot_network
-
+# Package includes for BNE
 include("impute_dataframe.jl")
 include("format_file.jl")
 include("bne.jl")
@@ -26,5 +14,3 @@ include("get_markov_blanket.jl")
 include("RRcalculator.jl")
 include("bne_bootstrap.jl")
 include("plot_network.jl")
-
-end

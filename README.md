@@ -1,1 +1,2 @@
 # BayesNetExplorer
+The BayesNetExplorer (BNE) package simplifies the creation, analysis, and interpretation of Bayesian networks. A user selects a target variable and calculates the probability of a target state outcome given one or more conditional variables. Absolute and relative risk ratios are obtained from any combination of conditional variables. Those variables with the greatest impact on the target are quickly identified, and the magnitude of their effect on the target, alone or in combination, are directly quantified.
