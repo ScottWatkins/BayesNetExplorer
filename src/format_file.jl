@@ -1,17 +1,32 @@
 """
-    format_file(data; datacols=[], delim=",", clean=false, minfreq=0.0, recode_bool=false, recode12=false)
+    df, ids, features = format_file(userdata; datacols=[], delim=",", clean=false, minfreq=0.0, recode_bool=false, recode12=false)
 
-Write a bnstruct input data matrix and header file from a data source. 
+Format input data and header files from a user provided data table. Write data and header files to disk (BN.data, BN.header). Write variable map file to disk (recode.map). 
 
-Input data can be a disk file or dataframe and must be a full matrix of observations in rows and features in columns. Observations and features must be fully labelled.  Features must be discrete or quantized variables. 
+Input data must be a full matrix with observations in rows and features in columns. Observations and features must be fully labeled.  Features must be discrete or quantized variables. The user input table must be text based unless it contains strictly boolean columns coded as 0/1 or true/false.
+
+Input examples
+
+ID,SIZE,FLIGHT,HABITAT \\
+X1,big,N,SAVANA \\
+X2,med,N,JUNGLE \\
+S4,sml,Y,FOREST \\
+D7,med,Y,RIPARIAN \\
+
+
+ID,V1,V2,V3 \\
+1,1,0,true \\
+4,0,0,false \\
+8,1,0,false \\
+9,1,1,true \\
+
 
 Options:
 
-datacols       specify a subset of data columns with vector array [].
-recode_bool    recode 0/1 input to boolean and 1/2 variables [false]
-delim          set delimiter for data file input [","]
-minfreq        min frequency for any variable state [0.0]. Use with clean.
-recode12       recode the output as 1 and 2; rarely used
+datacols: specify a subset of data columns with vector array []  \\
+recode_bool: recode 0/1 input to boolean and 1/2 variables [false]  \\
+delim: set delimiter for data file input [","]  \\
+minfreqmin: frequency for any variable state [0.0] Use with clean  \\
 
 """
 function format_file(infile::Union{String,DataFrame}; datacols::Array=[], delim::Union{String,Char}=",", minfreq::Float64=0.0, recode_bool::Bool=false, recode12::Bool=false)
@@ -22,13 +37,19 @@ function format_file(infile::Union{String,DataFrame}; datacols::Array=[], delim:
     dfc = size(df,2)
 
     BN = df
+
     
     if length(datacols) > 0
 
-        if !in(1, datacols) || maximum(datacols) > dfc
+        if !in(1, datacols) 
             error("Please always include the labels (column 1) and don't exceed column $dfc !\n\n")
         end
-
+        
+        if maximum(datacols) > dfc
+            error("Data column values should not exceed $dfc")
+        end
+        
+        
         BN = select(df, datacols)
 
     end
@@ -95,6 +116,9 @@ function format_file(infile::Union{String,DataFrame}; datacols::Array=[], delim:
 
     println("Wrote BN.data and BN.header files to disk.")
 
-    return BN
+    ids = df[!, 1]
+    features = names(BN)
+    
+    return BN, ids, features
 
 end

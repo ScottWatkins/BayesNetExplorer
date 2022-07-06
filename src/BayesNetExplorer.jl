@@ -10,9 +10,11 @@ export impute_dataframe
 export bne
 export RRcalculator
 export plot_network
+export feature_selector
 
 include("impute_dataframe.jl")
 include("format_file.jl")
+include("feature_selector.jl")
 include("bne.jl")
 include("run_bnlearn.jl")
 include("pcor.jl")

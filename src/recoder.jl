@@ -37,11 +37,16 @@ function recoder(d::Union{String,DataFrame}; recode12=false, recode_bool=false, 
 
     else
         
-        if in(0, unique(d[:,2]) )
+        if in(0, unique(d[:,2]) ) 
             if !in(2, unique(d[:,2]) )
                 println("Found values: ", unique(d[:,2]), " for first variable.")
                 error("\n\nInput data appears to be boolean. Use recode_bool or recode12 to format 0/1 data, or replace boolean column data with strings (e.g. Y/N) for mixed data sets\n\n")
-                end
+            end
+
+            if maximum(d[!, 2:5]) > 1
+                error("Please code data with multistate variables as strings, e.g. big/med/small ")
+            end
+            
         end
     end
 

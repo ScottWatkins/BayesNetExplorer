@@ -9,7 +9,7 @@ Options:
     method        graph layout [:circular|:stress]
     nodeshape     [:hexagon|:rect|:circle]
 """
-function plot_network(adjM::Matrix, headerfile::String=""; fnode="", gnodes=[], DAG=true, nodeshape=:hexagon, method=:stress)
+function plot_network(adjM::Matrix, headerfile::String=""; fnode="", gnodes=[], DAG=true, nodeshape=:rect, method=:stress)
 
     nodenames = split(replace(readline(headerfile), "\"" =>""), r"\s+")
     

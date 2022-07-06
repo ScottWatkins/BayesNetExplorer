@@ -56,7 +56,6 @@
 """
 function bne(data, header; impute=false, algo="sm", scoring_method="BIC", f::String="", fs=0, g::Array=[], gs::Array=[], bootstrap=0, iterate::String="", minfreq::Float64=0.00, verbose::Bool=false, relrisk::Bool=false, rr_bootstrap::Int=100, bootstrap_method::String="resample", DAG::Bool=false, plot::String="net")
 
-
     if sum(occursin.(r" ", gs)) > 0
         error("\nSpaces are not allowed in the gs states: gs = $gs\n\n")
     end
@@ -72,6 +71,11 @@ function bne(data, header; impute=false, algo="sm", scoring_method="BIC", f::Str
     vardat = readlines("$header")
     headdat = replace(readline("$header"), "\"" => "")
     headdat = String.(split(headdat, r"\s+"))
+
+    if length(headdat) > 20
+        error("\n\nBNE: input data exceeds the recommended 20 variables. Exiting.\n")
+    end
+      
     numstates = parse.(Int64, split(vardat[2]))
     types = split(vardat[3])
 
@@ -89,11 +93,11 @@ function bne(data, header; impute=false, algo="sm", scoring_method="BIC", f::Str
     R"dataset <- BNDataset( $data, $header, starts.from = 1)"  #must use 1-based variables
 
     vars = rcopy(R"vars <- variables(dataset)")
-    exv = length(vars) - size(dfcleaned, 2) 
+#    exv = length(vars) - size(dfcleaned, 2) 
 
-    if exv > 0
-        error("Found $exv variables that do not meet a minfreq of $minfreq.\nPlease rerun format_files() to filter data.")
-    end
+#    if exv > 0
+#        error("Found $exv variables that do not meet a minfreq of $minfreq.\nPlease rerun format_files() to filter data.")
+#    end
     
     if impute == true
         R"dataset <- impute(dataset)"
@@ -121,7 +125,7 @@ function bne(data, header; impute=false, algo="sm", scoring_method="BIC", f::Str
     boots = rcopy(R"b <- has.boots(dataset)")
     bootcount = rcopy(Int.(R"bc <- num.boots(dataset)"))
    
-    println("Created a Bayes net. Bootstrap: $boots, $bootcount")
+    println("Creating the network ...")
 
     if boots == true
         @suppress R"wpnet  <- wpdag.from.dag(net)"  #wp net object
@@ -157,7 +161,7 @@ function bne(data, header; impute=false, algo="sm", scoring_method="BIC", f::Str
         plt = plot_network(adjM, "BN.header", fnode=f, gnodes=g, DAG=DAG ) #DAG in, converted if UG
         display(plt)
     else
-        println("Plot must be either net (entire net) or mb (markov blanket of target).")
+        println("Plot must be either net (entire net) or mb (markov blanket of target) or skip.")
     end
     
     nodevals = rcopy(Int.(R"get.most.probable.values(net, prev.values = NULL)")) 
@@ -258,7 +262,7 @@ function bne(data, header; impute=false, algo="sm", scoring_method="BIC", f::Str
         println("$('-'^75)")
         printstyled("Performing single probability query ...\nList will include probabilities for all states of $f ...\n", color=:green)
         probout = ConProb(; f=f, g=g, gs=gs, vars=vars, verbose=true, rr_bootstrap=1)        
-        
+
         gso = replace(gs, "1" => "2", "2" => "1")
         probout_o = ConProb(; f=f, g=g, gs=gso, vars=vars, verbose=false, rr_bootstrap=1);        
         
@@ -333,6 +337,6 @@ function bne(data, header; impute=false, algo="sm", scoring_method="BIC", f::Str
 
     CSV.write("BN_cpts.table", dfp)
 
-    return dfp, df_j, dftf, adjM, mbM  #cpdf, df of used variables, target state freq
+    return dfp, df_j, dftf, adjM, mbM, probout  #cpdf, df of used variables, target state freq
 
 end
