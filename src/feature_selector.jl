@@ -1,5 +1,5 @@
 """
-    df = feature_selector(filename;  f="target", features=[], netsize=7)
+    df = feature_selector(filename;  f="target", features=[], ids=[], netsize=7)
 
 Test each feature (variable) in a data set, one-by-one, against the target variable. Measure the relative change to the baseline probability of the target variable when conditioned on the feature. Probabilities are network propagated with BNE.
 
@@ -8,11 +8,18 @@ This function returns a data frame (df) of conditional probabilities and the cha
 Notes: please use the format_file() function to create the BN.data file, the BN.header files, and list of features for input. If a crash occurs due to graphNel, try increasing the netsize. Runtimes will increase with increasing netsize.
 
 """
-function feature_selector(filename::Union{String,DataFrame}=""; f::String="",  features::Array=[], netsize::Int64=7)
+function feature_selector(filename::Union{String,DataFrame}=""; f::String="",  features::Array=[], ids::Array=[], netsize::Int64=7)
 
     if typeof(filename) == DataFrame
         if length(unique(filename[!,1])) < size(filename,1)
-            error("\n\nColumn 1 should always contain sample ids with unique labels. Exiting.\n")
+            if length(ids) == size(filename,1)
+                insertcols!(filename, 1, :IDS => ids)
+                println("Add ids to the input data frame,")
+            elseif length(ids) == 0
+                error("Please provide ids for the data frame.")
+            else
+                error("The ids array must match the data frame.")
+            end
         end
     end
     

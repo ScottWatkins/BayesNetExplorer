@@ -73,7 +73,7 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
     headdat = String.(split(headdat, r"\s+"))
 
     if length(headdat) > 20
-        error("\n\nBNE: input data exceeds the recommended 20 variables.\nPlease select up to 20 variables using the format_file() function.")
+        error("\n\nBNE: input data exceeds the recommended 20 variables.\nPlease select up to 20 variables for exact network analysis. Use for example format_file(\"filename.csv\", datacols=[1,2,5,6,7]) to create new files.\n\n")
     end
       
     numstates = parse.(Int64, split(vardat[2]))
@@ -268,15 +268,10 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
         gso = replace(gs, "1" => "2", "2" => "1")
         probout_o = ConProb(; f=f, g=g, gs=gso, vars=vars, verbose=false, rr_bootstrap=1);        
         
-        g = join(g, ",")            #create the proball array if doing a single query
-        gs = join(gs, ",")
-        probout = join([f, probout, g, gs], "|")
-        proball[mc] = probout
-
         if relrisk == true
 
             if length(unique(gso)) > 2
-                error("Relative risk calculations are limited to two-state variable.")
+                error("Relative risk calculations are limited to two-state variables.")
             end
             
             printstyled("Calculating relative and absolute risks with CI95 ($rr_bootstrap bootstraps) ...\n", color=:green)
@@ -293,7 +288,7 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
             
             tpf = dftf[fsi]          #target pop freq
             absrisk = round(rrr/tpf, digits=4)
-            
+
             CI95, PRdist = bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=scoring_method, f=f, fs=fs, g=g, gs=gs, bootstrap=0, iterate="", minfreq=0.00, verbose=false, rr_bootstrap=rr_bootstrap, bootstrap_method="resample")
             
             ARdist = sort(PRdist ./ tpf)
@@ -313,8 +308,16 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
             printstyled("    Absolute risk: $absrisk  CI95: ($ARlower, $ARupper)\n", color=:cyan)
             println("$('-'^75)")
 
+
+
+            
         end
 
+        g = join(g, ",")            #create the proball array if doing a single query
+        gs = join(gs, ",")          #for output into the cpt table. Warning g and gs are stringified.
+        probout = join([f, probout, g, gs], "|")
+        proball[mc] = probout
+        
     end
             
     header = ["Target"]     #create header for multiple states of target

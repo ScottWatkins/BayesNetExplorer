@@ -4,6 +4,7 @@
 function ConProb(;f="", g=g, gs=gs, type="conditional", vars=vars, verbose=false, rr_bootstrap=rr_bootstrap) # get P(feature|g1, g2, ... gn)
 
     if length(g) != length(gs)
+        println("g was: ", length(g), " gs was: ", length(gs))
         error("Please define a state for each conditional feature!")
     end
 
