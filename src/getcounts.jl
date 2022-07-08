@@ -10,14 +10,16 @@ function getcounts(df_cpt, dfc, target_state)
     t = split(target_state, "_")
     fs = string(t[end])
 
-    if fs == "true"
+    if occursin(r"(2)|(true)|(yes)"i, fs)
         fs = "2"
-    end
-
-    if fs == "false"
+    elseif occursin(r"(1)(false)|(no)"i, fs)
         fs = "1"
+    else
+        error("If X is a target, the target-state for true can be X_true, X_yes, or X_2 (case insensitive).\n Only two-state variables are allowed for risk calculations")
     end
-
+    
+    println("^^", fs)
+    
     f = join(t[1:end-1], "_")
 
     tcounts = Int64[]
@@ -41,6 +43,7 @@ function getcounts(df_cpt, dfc, target_state)
 
         p = "dfsubset[dfsubset." * f *  " .== " * fs * " , :]"
         tcall = Meta.parse(p)
+        println("===>",tcall)
         fcount = eval(tcall)
         
         push!(condcounts,  size(dfsubset,1))

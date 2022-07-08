@@ -25,6 +25,7 @@ function feature_selector(filename::Union{String,DataFrame}=""; f::String="",  f
     end
 
     df_all, ids, features_all = format_file(filename) # ids col cropped
+
     insertcols!(df_all, 1, :IDS => ids)               # replace ids in df
     println("Getting baseline probabilities...")
 
@@ -45,10 +46,12 @@ function feature_selector(filename::Union{String,DataFrame}=""; f::String="",  f
 
     format_file(df_all, datacols=fcols ) #rewrite small input BN.data, BN.header 
 
-    cpt, dft, tf, adj, mbM, baseline = bne("BN.data", "BN.header", f=f);
-
+    cpt, dft, tf, adj, mbM, probout_b = bne("BN.data", "BN.header", f=f);
+    probout_b = split(probout_b, "|")
+    blist = replace(probout_b[2][2:end-1], " "=>"") #ugh, return to Float array
+    baseline = parse.(Float64, split( (replace(blist, "\""=>"")), ","))
+    
     OUT = open("r.tmp", "w")
-
 
     for i in eachindex(features)
 
@@ -75,7 +78,7 @@ function feature_selector(filename::Union{String,DataFrame}=""; f::String="",  f
         end
 
         z = sort(z)
-        println("\n\n$z\n\n")
+
         format_file(df_all, datacols=z ) #rewrite a single variable BN.data, BN.header
           
         g = [n]
@@ -86,7 +89,11 @@ function feature_selector(filename::Union{String,DataFrame}=""; f::String="",  f
 
             cpt, dft, tf, adj, mbM, probout = bne("BN.data", "BN.header", f=f, g=g, gs=gs);
 
-            probout = join([ features[i], j, join(probout, ",") ], ",") 
+            probout = split(probout, "|")  
+            plist = replace(probout[2][2:end-1], " "=>"") #weird! WTF
+            plist = replace(plist, "\""=>"")
+            probout = join([probout[3], probout[4], plist ], ",") 
+            
             println(OUT, probout)
             #R"gc()"                       #force R garbage collection
         end
@@ -95,9 +102,10 @@ function feature_selector(filename::Union{String,DataFrame}=""; f::String="",  f
 
     close(OUT)
 
+    
     tnames = [f * "_" * string(i) for i in 1:fsc]
     pushfirst!(tnames, "CondVar", "CondVarState")
-    
+
     df_out = CSV.read("r.tmp", DataFrame, delim=",", header=tnames)
     df_out = sort(df_out, 3)
 

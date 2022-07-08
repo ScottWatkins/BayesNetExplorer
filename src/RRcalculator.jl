@@ -35,7 +35,6 @@ function RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::F
     end
     
     df_cpt = sort!( df_cpt[ (minp .≤ df_cpt[!,Symbol(target_state)] .≤ maxp) , :], Symbol(target_state), rev=true)
-    
     opp_prob = Union{Float64,Missing}[]
     
     for i in 1:size(df_cpt, 1)
@@ -52,6 +51,7 @@ function RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::F
         end
         
     end
+
 
     insertcols!(df_cpt, 4, "Prob(X)|(~Y)" => opp_prob)
     rr = df_cpt[!, Symbol(target_state)] ./ opp_prob
@@ -93,6 +93,7 @@ function RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::F
     global dfc = CSV.read("BN.data", DataFrame, delim=" ", header=headdat)
 
     condcounts, tcounts = getcounts(df_cpt, dfc, target_state)
+
     insertcols!(df_cpt, 8, :ConditionalStateNames => vnames)
     insertcols!(df_cpt, 7, :CondCount => condcounts)
     insertcols!(df_cpt, 7, :Count => tcounts)

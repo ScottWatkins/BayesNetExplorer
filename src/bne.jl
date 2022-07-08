@@ -1,5 +1,5 @@
 """
-    cpt, tt, tf, adjm = bne("BN.data", "BN.header"; algo="sm", scoring_method="bic", f="", fs=0,  g=[], gs=[], verbose=false, DAG=false)
+    cpt, tt, tf, adjM, mbM = bne("BN.data", "BN.header"; algo="sm", scoring_method="bic", f="", fs=0,  g=[], gs=[], verbose=false, DAG=false)
 
     Construct a Bayesian network. Inputs are the formatted data and header files (see format()). Data must be binary, discrete or discretized continuous [1,2, ..., N]. Return 1) the conditional probabilities, 2) a dataframe of all input variables, mappings and state frequencies 3) target state frequencies and 4) the graph adjacency matrix.
 
@@ -47,14 +47,14 @@
     bne("BN.data", "BN.header", algo="sm", scoring_method="BIC", f="A", g=["B", "C", ], gs=["2","1"] )
 
     2. Query feature for 3 specified nodes. All states for all nodes examined.
-    cpt, c_df, f, adjM = bne("BN.data", "BN.header", algo="hc", scoring_method="AIC", f="A", g=["B", "C", "D" ], iterate="nodes" )
+    cpt, c_df, f, adjM, mbM = bne("BN.data", "BN.header", algo="hc", scoring_method="AIC", f="A", g=["B", "C", "D" ], iterate="nodes" )
 
     3. Query feature for all nodes. All states for all nodes examined.
-    cpt, c_df, f, adjM = bne("BN.data", "BN.header", algo="sm", scoring_method="BDeu", f="A", iterate="all" )
+    cpt, c_df, f, adjM, mbM = bne("BN.data", "BN.header", algo="sm", scoring_method="BDeu", f="A", iterate="all" )
 
 
 """
-function bne(data, header; impute=false, algo="sm", scoring_method="BIC", f::String="", fs=0, g::Array=[], gs::Array=[], bootstrap=0, iterate::String="", minfreq::Float64=0.00, verbose::Bool=false, relrisk::Bool=false, rr_bootstrap::Int=100, bootstrap_method::String="resample", DAG::Bool=false, plot::String="net")
+function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, g::Array=[], gs::Array=[], bootstrap=0, impute::Bool=false, iterate::String="", minfreq::Float64=0.00, verbose::Bool=false, relrisk::Bool=false, rr_bootstrap::Int=100, bootstrap_method::String="resample", DAG::Bool=false, plot::String="net")
 
     if sum(occursin.(r" ", gs)) > 0
         error("\nSpaces are not allowed in the gs states: gs = $gs\n\n")
@@ -73,7 +73,7 @@ function bne(data, header; impute=false, algo="sm", scoring_method="BIC", f::Str
     headdat = String.(split(headdat, r"\s+"))
 
     if length(headdat) > 20
-        error("\n\nBNE: input data exceeds the recommended 20 variables. Exiting.\n")
+        error("\n\nBNE: input data exceeds the recommended 20 variables.\nPlease select up to 20 variables using the format_file() function.")
     end
       
     numstates = parse.(Int64, split(vardat[2]))
@@ -93,14 +93,15 @@ function bne(data, header; impute=false, algo="sm", scoring_method="BIC", f::Str
     R"dataset <- BNDataset( $data, $header, starts.from = 1)"  #must use 1-based variables
 
     vars = rcopy(R"vars <- variables(dataset)")
-#    exv = length(vars) - size(dfcleaned, 2) 
+    exv = length(vars) - size(dfcleaned, 2) 
 
-#    if exv > 0
-#        error("Found $exv variables that do not meet a minfreq of $minfreq.\nPlease rerun format_files() to filter data.")
-#    end
+    if exv > 0
+        error("Found $exv variables that do not meet a minfreq of $minfreq.\nPlease rerun format_files() to filter data.")
+    end
     
     if impute == true
-        R"dataset <- impute(dataset)"
+        error("\n\nImputation is now implemented in the impute_dataframe() function\n")
+        #R"dataset <- impute(dataset)"
     end
 
     # use @suppress to suppress screen output by R 
@@ -261,11 +262,17 @@ function bne(data, header; impute=false, algo="sm", scoring_method="BIC", f::Str
 
         println("$('-'^75)")
         printstyled("Performing single probability query ...\nList will include probabilities for all states of $f ...\n", color=:green)
+
         probout = ConProb(; f=f, g=g, gs=gs, vars=vars, verbose=true, rr_bootstrap=1)        
 
         gso = replace(gs, "1" => "2", "2" => "1")
         probout_o = ConProb(; f=f, g=g, gs=gso, vars=vars, verbose=false, rr_bootstrap=1);        
         
+        g = join(g, ",")            #create the proball array if doing a single query
+        gs = join(gs, ",")
+        probout = join([f, probout, g, gs], "|")
+        proball[mc] = probout
+
         if relrisk == true
 
             if length(unique(gso)) > 2
@@ -332,11 +339,14 @@ function bne(data, header; impute=false, algo="sm", scoring_method="BIC", f::Str
 
     R"rm(list = ls())"    #clear R workspace
 
-    dfp = CSV.read("BN.grain.cpts.out", DataFrame, delim="|", header=header )
+    dfp = CSV.read("BN.grain.cpts.out", DataFrame, delim="|", header=header)
+
     dfp = sort(dfp, [2,3,4], rev=[true,true,true])
 
     CSV.write("BN_cpts.table", dfp)
 
+    rm("BN.grain.cpts.out")
+    
     return dfp, df_j, dftf, adjM, mbM, probout  #cpdf, df of used variables, target state freq
 
 end
