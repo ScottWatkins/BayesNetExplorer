@@ -1,4 +1,4 @@
-"""A
+"""
     r, rmap = recoder(d::Union{String,DataFrame}; recode_bool=false, delim=",")
 
 Recode text data from a file or dataframe to a numerical or boolean dataframe. Recoded values are returned in the rmap dictionary. Input data must be a full matrix with row and column labels.
@@ -15,11 +15,13 @@ function recoder(d::Union{String,DataFrame}; recode12=false, recode_bool=false, 
         d = CSV.read(d, DataFrame, delim=delim)
     end
     
+    col1name = Symbol(names(d)[1])
+
     if recode_bool == true
 
         db = Bool.(d[!, 2:end])
         d = hcat(d[:,1], db)
-        rename!(d, :x1 => "IID")
+        rename!(d, :x1 => col1name)
         CSV.write("recoded.bool.csv", d, delim=",")
         println("Wrote file recoded.bool.csv to disk.")
         d = CSV.read("recoded.bool.csv", DataFrame, delim=",", types=String)
@@ -40,7 +42,7 @@ function recoder(d::Union{String,DataFrame}; recode12=false, recode_bool=false, 
         if in(0, unique(d[:,2]) ) 
             if !in(2, unique(d[:,2]) )
                 println("Found values: ", unique(d[:,2]), " for first variable.")
-                error("\n\nInput data appears to be boolean. Use recode_bool or recode12 to format 0/1 data, or replace boolean column data with strings (e.g. Y/N) for mixed data sets\n\n")
+                error("\n\nInput data appears to be boolean. Use recode_bool to format strictly 0/1 true/false data, or replace boolean column data with strings (e.g. Y/N) in mixed data sets\n\n")
             end
 
             if maximum(d[!, 2:5]) > 1

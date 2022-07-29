@@ -30,6 +30,7 @@
 
         rr_bootstrap        number bootstrap interations        [100]
         bootstrap_method    resample or delete half             [resample]
+        bootout             write and append results to file    ""
 
     Plot options
 
@@ -54,12 +55,18 @@
 
 
 """
-function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, g::Array=[], gs::Array=[], bootstrap=0, impute::Bool=false, iterate::String="", minfreq::Float64=0.00, verbose::Bool=false, relrisk::Bool=false, rr_bootstrap::Int=100, bootstrap_method::String="resample", DAG::Bool=false, plot::String="net")
+function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, g::Array=[], gs::Array=[], bootstrap=0, impute::Bool=false, iterate::String="", minfreq::Float64=0.00, verbose::Bool=false, relrisk::Bool=false, rr_bootstrap::Int=100, bootstrap_method::String="resample", bootout="",  DAG::Bool=false, plot::String="net")
 
     if sum(occursin.(r" ", gs)) > 0
         error("\nSpaces are not allowed in the gs states: gs = $gs\n\n")
     end
 
+    if length(iterate) > 0
+        if relrisk == true
+        error("\n\nUse the relrisk option to obtain final risk estimates with confidence intervals for a single target-feature(s) combination. See feature_selector() and RRcalculator() for multi-feature risk calculations and more options.\n\n")
+        end
+    end
+    
     println("Building bayes net using the $algo algorithm and the $scoring_method scoring method ...")
     
     @suppress R"library(bnstruct)"
@@ -75,7 +82,7 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
     if length(headdat) > 20
         error("\n\nBNE: input data exceeds the recommended 20 variables.\nPlease select up to 20 variables for exact network analysis. Use for example format_file(\"filename.csv\", datacols=[1,2,5,6,7]) to create new files.\n\n")
     end
-      
+
     numstates = parse.(Int64, split(vardat[2]))
     types = split(vardat[3])
 
@@ -195,13 +202,13 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
     println("Calculating probabilities...")
     
     if iterate == "all"
-
+        
         if length(g) > 0 || length(gs) > 0
             printstyled("INFO: Iterating all; ignoring user-specified condititional states.\n", color=:yellow)
         end
         
         if length(vars) > 20
-            error("Too many variables to iterate all of them!")
+            error("Final variable count > 20: Too many variables to iterate all of them!")
         end
         
         if length(f) == 0
@@ -220,13 +227,12 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
             if length(unique(g)) < length(g)  
                 continue
             end
-            
-            probout = ConProb(; f=f, g=g, gs=gs, vars=vars, verbose=verbose, rr_bootstrap=0)    
+
+            probout = ConProb(; f=f, g=g, gs=gs, vars=vars, verbose=verbose, rr_bootstrap=0)
             proball[mc] = probout
             mc += 1
             
         end
-        
 
     elseif iterate == "nodes"
 
@@ -254,9 +260,8 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
             probout = ConProb(; f=f, g=g, gs=gs, vars=vars, verbose=verbose, rr_bootstrap = 0)    
             proball[mc] = probout
             mc += 1
-            
+ 
         end
-
 
     else
 
@@ -270,10 +275,6 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
         
         if relrisk == true
 
-            if length(unique(gso)) > 2
-                error("Relative risk calculations are limited to two-state variables.")
-            end
-            
             printstyled("Calculating relative and absolute risks with CI95 ($rr_bootstrap bootstraps) ...\n", color=:green)
             println("$('-'^75)")
             
@@ -286,30 +287,42 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
             rro = probout_o[fsi]     #rr opp prob
             RR = round(rrr / rro, digits=4)
             
-            tpf = dftf[fsi]          #target pop freq
+            tpf = dftf[fsi]          #target (baseline) pop freq
+
             absrisk = round(rrr/tpf, digits=4)
 
             CI95, PRdist = bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=scoring_method, f=f, fs=fs, g=g, gs=gs, bootstrap=0, iterate="", minfreq=0.00, verbose=false, rr_bootstrap=rr_bootstrap, bootstrap_method="resample")
-            
+
+            #println("====>", PRdist, "\n", tpf)
             ARdist = sort(PRdist ./ tpf)
             ARupper = round(ARdist[ Int(floor(length(ARdist) * 0.975)) ], digits=4)
             ARlower = round(ARdist[ Int(ceil(length(ARdist) * 0.025)) ], digits=4)
             tpf = round(tpf, digits = 6)
             
-            println("Relative risk:\n")
+            println("Relative Risk Ratio:\n")
             println("    P($f=$fs)|($g); states=$gs; P = $rrr")
             println("       vs.")
             println("    P($f=$fs)|($g); states=$gso; P = $rro\n")
-            printstyled("    Relative Risk: $RR  CI95: $CI95\n\n", color=:cyan)
-            println("Absolute risk:\n")
+            printstyled("    Relative Risk Ratio: $RR  CI95: $CI95\n\n", color=:cyan)
+            println("Absolute Risk Ratio:\n")
             println("    P($f=$fs)|($g); states=$gs")
             println("       vs.")
-            println("    P($f=$fs), all samples; P = $tpf\n")
-            printstyled("    Absolute risk: $absrisk  CI95: ($ARlower, $ARupper)\n", color=:cyan)
+            println("    P($f=$fs) = $tpf; (baseline risk of $f)\n")
+            printstyled("    Absolute Risk Ratio: $absrisk  CI95: ($ARlower, $ARupper)\n", color=:cyan)
             println("$('-'^75)")
 
-
-
+            if length(bootout) > 0
+                tvl = f * "=" * fs
+                cvl = ""
+                for i in eachindex(g)
+                    cvl = cvl * string(g[i]) * "=" * string(gs[i]) * ","
+                end
+                RRlower = CI95[1]
+                RRupper = CI95[2]
+                OUT = open(bootout, "a")
+                println(OUT, "$tvl\t$cvl\t$tpf\t$absrisk\t$ARlower\t$ARupper\t$RR\t$RRlower\t$RRupper")
+                close(OUT)
+            end
             
         end
 

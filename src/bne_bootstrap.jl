@@ -55,9 +55,10 @@ function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=sco
     headdat = String.(split(headdat, r"\s+"))
     numstates = parse.(Int64, split(vardat[2]))
     types = split(vardat[3])
+    
+        dfcleaned, df_freq = clean_dfvars_by_frequency("$data", minfreq; nolabels=true, delim=" ", header=headdat)
 
-    dfcleaned, df_freq = clean_dfvars_by_frequency("$data", minfreq; nolabels=true, delim=" ", header=headdat)
-
+    
     RRdist = Float64[]   
     PRdist = Float64[]
     fs = parse(Int, fs)
@@ -69,7 +70,7 @@ function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=sco
         if z % 10 == 0
             print(z)
         end
-        
+
         z == rr_bootstrap ? println() : print(".")
 
         bd = Matrix(dfcleaned)
@@ -143,14 +144,16 @@ function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=sco
         R"rm(list = ls())"    #clear R workspace each run
 
     end
+    
     RRdist = sort(RRdist)
     upper = RRdist[ Int(floor(length(RRdist) * 0.975)) ]
     lower = RRdist[ Int(ceil(length(RRdist) * 0.025)) ]
     
     CI95 = (round(lower, digits=4), round(upper, digits=4))
-
+    RR_est = round(mean(RRdist), digits=4)
     run(`bash -c "rm -f bd_*"`)
     
-    return CI95, PRdist
+    return CI95, PRdist, RR_est
 
 end
+

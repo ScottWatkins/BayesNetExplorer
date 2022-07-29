@@ -25,9 +25,14 @@ RRcalculator(cpt, target\\_state="Mortality\\_true", target\\_state\\_freq=0.001
 function RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::Float64, translation_table::DataFrame, filterstates::String="", keep::String="", minp::Float64=0.01, maxp::Float64=0.99,  mincondcount::Int=1)
 
     if length(target_state_freq) < 1
-        error("You must provide the frequency of the target state observed in the whole dataset!\nThis is the population frequency over all samples.")
+        error("You must provide the baseline frequency of the target state observed in the whole dataset.\nThis is the population frequency over all samples.\n")
     end
 
+    if size(cpt, 1) < 3
+        error("\n\nRRcalculator iterates over two or more conditional traits.\nPlease add additional traits, or use bne to estimate\nthe relative risk for a single conditional feature.\n\n")
+    end
+    
+    
     df_cpt = copy(cpt)
 
     if in(target_state, names(cpt)) == false
@@ -36,7 +41,7 @@ function RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::F
     
     df_cpt = sort!( df_cpt[ (minp .≤ df_cpt[!,Symbol(target_state)] .≤ maxp) , :], Symbol(target_state), rev=true)
     opp_prob = Union{Float64,Missing}[]
-    
+
     for i in 1:size(df_cpt, 1)
 
         cvars = df_cpt[i, 4]
@@ -51,7 +56,6 @@ function RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::F
         end
         
     end
-
 
     insertcols!(df_cpt, 4, "Prob(X)|(~Y)" => opp_prob)
     rr = df_cpt[!, Symbol(target_state)] ./ opp_prob
@@ -80,7 +84,6 @@ function RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::F
         x = ""
 
         for j in eachindex(cvd)
-            #println("-->",  cvd, " ", csd)
             p = cvd[j] * "_" * csd[j]
             x = x * "," * string(get(ht, p, 0))
         end

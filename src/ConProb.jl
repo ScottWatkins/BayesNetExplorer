@@ -15,6 +15,7 @@ function ConProb(;f="", g=g, gs=gs, type="conditional", vars=vars, verbose=false
     q = "\'"
 
     feature = join(["c(", q, f, q, ")"], "") #gRain string   
+
     gnodes=""; gstates="";
 
     for i in g
@@ -28,7 +29,6 @@ function ConProb(;f="", g=g, gs=gs, type="conditional", vars=vars, verbose=false
     end
     
     gstates = join(["c(", gstates[2:end], ")"] , "") # done creating strings 
-
     R"f <- $feature"
     R"g <- $gnodes"; R"gs <- $gstates"
     R"ev_net1 <- setEvidence(pnet, nodes = $g, states = $gs )"   #set states
@@ -48,7 +48,7 @@ function ConProb(;f="", g=g, gs=gs, type="conditional", vars=vars, verbose=false
     if rr_bootstrap > 0
         qout = probout
     end
-    
+
     return qout
 
 end

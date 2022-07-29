@@ -1,11 +1,11 @@
 """
-    df, ids, features = format_file(userdata; datacols=[], delim=",", clean=false, minfreq=0.0, recode_bool=false, recode12=false)
+    df, ids, features = format_file(userdata; datacols=[], delim=",", minfreq=0.0, recode_bool=false)
 
-Format input data and header files from a user provided data table. Write data and header files to disk (BN.data, BN.header). Write variable map file to disk (recode.map). 
+Format input data and header files from a user provided data table. Write data and header files to disk (BN.data, BN.header). Write variable map file to disk (recode.map). The user input table *must* be text based unless it contains strictly boolean columns coded as 0/1 or true/false.
 
-Input data must be a full matrix with observations in rows and features in columns. Observations and features must be fully labeled.  Features must be discrete or quantized variables. The user input table must be text based unless it contains strictly boolean columns coded as 0/1 or true/false.
+Input data must be a full matrix with observations in rows and features in columns. Observations and features must be fully labeled.  Features must be discrete or quantized variables. 
 
-Input examples
+Input examples for text and boolean data sets: \\
 
 ID,SIZE,FLIGHT,HABITAT \\
 X1,big,N,SAVANA \\
@@ -20,35 +20,37 @@ ID,V1,V2,V3 \\
 8,1,0,false \\
 9,1,1,true \\
 
-
-Options:
+Options: \\
 
 datacols: specify a subset of data columns with vector array []  \\
-recode_bool: recode 0/1 input to boolean and 1/2 variables [false]  \\
+recode_bool: recode strictly 0/1 or true/false variables to 1/2 variables [false]  \\
 delim: set delimiter for data file input [","]  \\
-minfreqmin: frequency for any variable state [0.0] Use with clean  \\
+minfreq: the minimum frequency for any variable state [0.0]  \\
 
 """
 function format_file(infile::Union{String,DataFrame}; datacols::Array=[], delim::Union{String,Char}=",", minfreq::Float64=0.0, recode_bool::Bool=false, recode12::Bool=false)
 
+    if typeof(infile) == String
+        if !isfile(infile)
+            error("\n\nCould not find infile: $infile\n\n")
+        end
+    end
+        
     df, rmap = recoder(infile, recode_bool=recode_bool, recode12=recode12, delim=delim)
 
     ids = df[:,1]
     dfc = size(df,2)
 
     BN = df
-
+    col1 = Symbol(names(df)[1])
     
     if length(datacols) > 0
 
-        if !in(1, datacols) 
-            error("Please always include the labels (column 1) and don't exceed column $dfc !\n\n")
+        if in(1, datacols) || in(Symbol(names(df)[1]), datacols)
+            println("Selected data includes the labels column...")
+        else
+            error("\n\nPlease always include the first column, :$col1, and don't exceed column $dfc !\n\n")
         end
-        
-        if maximum(datacols) > dfc
-            error("Data column values should not exceed $dfc")
-        end
-        
         
         BN = select(df, datacols)
 
@@ -57,7 +59,7 @@ function format_file(infile::Union{String,DataFrame}; datacols::Array=[], delim:
     if minfreq > 0.0
 
         dfcleaned, df_freq, labels = clean_dfvars_by_frequency(BN, minfreq, header=true, nolabels=false)
-        BN = insertcols!(dfcleaned, 1, :IID => ids)
+        BN = insertcols!(dfcleaned, 1, col1 => ids)
 
     end            
     

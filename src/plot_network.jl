@@ -1,15 +1,16 @@
 """
-    plot_network(adjM::Matrix, headerfile::string="", fnode="", gnodes=[], DAG=false, nodeshape=:hexagon )
+    plot_network(adjM::Matrix, headerfile::string="", fnode="", gnodes=[], DAG=true, nodeshape=:circle )
 
 Plot a Bayesean network from a bnstruct DAG using a DAG adjacency matrix. Node names are taken from the bnstruct header file.
 
 Options:
     gnodes        color nodes given in an array
     fnode         color a feature/target node given as a string 
-    method        graph layout [:circular|:stress]
-    nodeshape     [:hexagon|:rect|:circle]
+    method        graph layout [:circular|:stress|:hexagon]
+    nodeshape     shape of the nodes         [:hexagon|:rect|:circle]
+    trimnames     max characters for names   [20]
 """
-function plot_network(adjM::Matrix, headerfile::String=""; fnode="", gnodes=[], DAG=true, nodeshape=:rect, method=:stress)
+function plot_network(adjM::Matrix, headerfile::String=""; fnode="", gnodes=[], DAG=true, nodeshape=:circle, method=:stress, trimnames=20)
 
     nodenames = split(replace(readline(headerfile), "\"" =>""), r"\s+")
     
@@ -34,18 +35,29 @@ function plot_network(adjM::Matrix, headerfile::String=""; fnode="", gnodes=[], 
             elseif in(i, cn)
                 push!(c, ncolors[2])
             else
-                push!(c, :grey80)
+                push!(c, :linen)
             end                        
         end
     else
-        c = repeat([:grey80], length(nodenames))
+        c = repeat([:grey90], length(nodenames))
     end
 
     function cpad(nodenames::Array=[])
         #nodenames = replace.(nodenames, "_" => "")
+
+        if trimnames < 20
+            for i in eachindex(nodenames)
+                if length(nodenames[i]) > trimnames
+                    nodenames[i] = nodenames[i][1:trimnames]
+                end
+            end
+        end
+        
+
         sz = maximum(length.(nodenames))   
         pd = Int.(ceil.(( sz .- length.(nodenames)) ./ 2)) .+ 5
         for i in eachindex(nodenames)
+
             pr = length(nodenames[i]) + pd[i]
             npr = rpad(nodenames[i], pr)
             pl = length(npr) + pd[i]
@@ -60,9 +72,9 @@ function plot_network(adjM::Matrix, headerfile::String=""; fnode="", gnodes=[], 
     n = length(nodenames)
     w = repeat([sz], n)
     s = repeat([nodeshape], n)
-    plot(size(1000,1000))
+    plot(size(1500,1500))
     
-    function make_sym(T)   #convert the bnstruct dag matrix to symetrical
+    function make_sym(T)   #convert the bnstruct dag matrix to symmetrical
         M = zeros(size(T))
 
         for i=1:size(T,1)
@@ -84,15 +96,15 @@ function plot_network(adjM::Matrix, headerfile::String=""; fnode="", gnodes=[], 
     end
     
     graphplot(M,
-              linewidth=1,
+              linewidth=1.5,
               nodecolor=c,
               nodeshape=nodeshape,
-              nodesize=0.1,
+              nodesize=0.05,
               #node_weights=w,
               #color=:green,
               curves=false,
-              axis_buffer=0.2,
-              linecolor = "blue",
+              axis_buffer=0.1,
+              linecolor = :blue,
               linealpha = 0.99,
               dims=2,
               names=nodenames,
