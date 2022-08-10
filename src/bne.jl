@@ -92,9 +92,19 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
 
     print("Getting variable frequencies...\n")
 
-    # Full tables only; cleaned df should be made with makeBNdataset.jl
+    # Full tables only; cleaned df should be made with format_file.jl
     dfcleaned, df_freq = clean_dfvars_by_frequency("$data", minfreq; nolabels=true, delim=" ", header=headdat)
 
+    #check input and features
+    println("Checking input features and states ...")
+    for i in eachindex(g)
+        if in(parse(Int64, gs[i]), dfcleaned[:, Symbol(g[i])])
+            println("Feature: ", g[i], " state: ", gs[i], " ... OK.")
+        else
+            error("\n\nFeature: ", g[i], " state: ", gs[i], " ... not found. Check input.\n\n")
+        end
+    end
+    
     print("Processing network data...\n")
     
     R"dataset <- BNDataset( $data, $header, starts.from = 1)"  #must use 1-based variables
@@ -279,9 +289,13 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
             println("$('-'^75)")
             
             if fs == 0 || typeof(fs) == Int
-                error("\nPlease set indicate the feature-state you wish to bootstrap (\"1\" or \"2\").\n")
-            end
-
+                error("\n\nPlease set the target state to bootstrap in string format (e.g. \"2\").\n")
+            elseif in( parse(Int64,fs), dfcleaned[:, Symbol(f)] )
+                println("Target: ", f, ", state: ", fs, " ... OK.")
+            else
+                error("\n\nTarget: ", f, ", state: ", fs, " ... not found. Check input.\n\n")
+	    end
+            
             fsi = parse(Int,fs)
             rrr = probout[fsi]       #rr target prob
             rro = probout_o[fsi]     #rr opp prob

@@ -1,17 +1,17 @@
 """
-    plot_network(adjM::Matrix, headerfile::string="", fnode="", gnodes=[], DAG=true, nodeshape=:circle )
+    plot_network(adjM::Matrix, headerfile::string; fnode="", gnodes=[], DAG=true, nodeshape=:circle )
 
-Plot a Bayesean network from a bnstruct DAG using a DAG adjacency matrix. Node names are taken from the bnstruct header file.
+Plot a Bayesean network from a bnstruct DAG using a DAG adjacency matrix. Node names are taken from the bnstruct header file. You must include the adjacency matrix and the header file (e.g. plot_network(adjM, "BN.header"; kwargs) )
 
-Options:
-    gnodes        color nodes given in an array
-    fnode         color a feature/target node given as a string 
-    method        graph layout [:circular|:stress|:hexagon]
-    nodeshape     shape of the nodes         [:hexagon|:rect|:circle]
-    trimnames     max characters for names   [20]
+Options: \\
+gnodes........color nodes given in an array...[""] \\
+fnode.........color a feature target node....."" \\ 
+method........graph layout [:circular|:stress|:hexagon] \\
+nodeshape.....shape of the nodes..............[:hexagon|:rect|:circle] \\
+trimnames.....max characters for names........20 \\
 """
 function plot_network(adjM::Matrix, headerfile::String=""; fnode="", gnodes=[], DAG=true, nodeshape=:circle, method=:stress, trimnames=20)
-
+    
     nodenames = split(replace(readline(headerfile), "\"" =>""), r"\s+")
     
     if length(gnodes) > 0 || length(fnode) > 0

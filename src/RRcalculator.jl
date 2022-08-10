@@ -45,7 +45,9 @@ function RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::F
     for i in 1:size(df_cpt, 1)
 
         cvars = df_cpt[i, 4]
+        
         opp_state = replace(df_cpt[i, 5], "1" => "2", "2" => "1")
+
         df_cptx = df_cpt[ .&(df_cpt.ConditionalVariables .== cvars, df_cpt.ConditionalStates .== opp_state), :]
 
         if size(df_cptx,1) > 0
