@@ -42,7 +42,6 @@
 
         minfreq      min variable state frequency cutoff [0.00]
         verbose      verbose output                      [false]
-        confmeth     CI95 calculation method             normal|empirical
 
     Examples:
 
@@ -57,30 +56,25 @@
 
 
 """
-function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, g::Array=[], gs::Array=[], bootstrap=0, impute::Bool=false, iterate::String="", minfreq::Float64=0.00, verbose::Bool=false, relrisk::Bool=false, rr_bootstrap::Int=100, bootstrap_method::String="resample", bootout="",  DAG::Bool=false, plot::String="net", boot_plot::Bool=false, nolimit::Bool=false, confmeth::String="normal")
+function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, g::Array=[], gs::Array=[], bootstrap=0, impute::Bool=false, iterate::String="", minfreq::Float64=0.00, verbose::Bool=false, relrisk::Bool=false, rr_bootstrap::Int=100, bootstrap_method::String="resample", bootout="",  DAG::Bool=false, plot::String="net", boot_plot=false, ignorelimit=false)
 
     if sum(occursin.(r" ", gs)) > 0
         error("\nSpaces are not allowed in the gs states: gs = $gs\n\n")
     end
 
     if length(iterate) > 0
-        
-        if !occursin(r"(all)|(nodes)", iterate)
-            error("\n\niterate must be \"nodes\" or \"all\" not $iterate\n\n")
-        end
-        
         if relrisk == true
         error("\n\nUse the relrisk option to obtain final risk estimates with confidence intervals for a single target-feature(s) combination. See feature_selector() and RRcalculator() for multi-feature risk calculations and more options.\n\n")
         end
-
     end
 
-    if occursin(r"\b(sm|hc|mmhc|sem)\b", algo )
-    
-        println("Building bayes net using the $algo algorithm and the $scoring_method scoring method ...")
-    else
-        error("\n\nERROR: $algo is not an implemented algorithm.\n\n")
+    if length(bootout) > 0 && !isfile("bootheader.txt")   #header for bootstrap file
+        OUT = open("bootheader.txt", "w")
+        println(OUT, "Target\tConditionals\tP(T)\tP(T|C)\tARR\tARRest\tARRlower\tARRupper\tRRR\tRRRest\tRRRlower\tRRRupper")
+        close(OUT)
     end
+
+    println("Building bayes net using the $algo algorithm and the $scoring_method scoring method ...")
     
     @suppress R"library(bnstruct)"
     @suppress R"library(qgraph)"
@@ -92,19 +86,12 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
     headdat = replace(readline("$header"), "\"" => "")
     headdat = String.(split(headdat, r"\s+"))
 
-    if length(bootout) > 0 && !isfile("bootheader.txt")   #header for bootstrap file
-        OUT = open("bootheader.txt", "w")
-        println(OUT, "## Network nodes: $headdat ")
-        println(OUT, "Target\tConditionals\tP(T)\tP(T|C)\tARR\tARRest\tARRlower\tARRupper\tRRR\tRRRest\tRRRlower\tRRRupper")
-        close(OUT)
-    end
-    
-    limit = 17
-    if nolimit == true
+    limit = 20
+    if ignorelimit == true
         limit = 1000
     else
         if length(headdat) > limit
-            error("\n\nBNE: Input >16 variables will have very long compute times.\nSelect up to 16 variables for exact network analysis.\nFor example, format_file(\"filename.csv\", datacols=[1,2,5,6,7]).\n\nLarge approximate networks can be made with using\ngreedy algorithms (e.g., algo=\"hc\") and setting nolimit=true.\nGreedy networks may differ from the more accurate exact networks.\n\n")
+            error("\n\nBNE: input data exceeds 16 variables.\nSelect up to 16 variables for exact network analysis.\nFor example, format_file(\"filename.csv\", datacols=[1,2,5,6,7]).\nLarge approximate networks can be made with using greedy algorithms (e.g., hc) with ignorelimit=true. Greedy networks may differ from exact networks.\n\n")
         end
     end
 
@@ -185,7 +172,7 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
     @suppress R"df = read.csv(file = $data, sep = ' ')"      # get data table
     @suppress R"colnames(df) <- vars"                        # label data table
     @suppress R"gn <- as(dadjm, 'graphNEL')"                 # DAG matrix
-    @suppress R"ecpt <- extractCPT(df, gn, smooth = 0.01)"   # extract CPT from data, smooth NaN  
+    @suppress R"ecpt <- extractCPT(df, gn, smooth = 0.00001)"  # extract CPT from data, smooth NaN  
     @suppress R"pt <- compileCPT(ecpt)"                      # 
     @suppress R"pnet <- grain(pt, propagate=T)"              # make cpt net, propagated, copy
                                                              # pnet goes into CondProb function
@@ -272,6 +259,7 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
             probout, jpout = ConProb(; f=f, g=g, gs=gs, vars=vars, verbose=verbose, rr_bootstrap=0)
             proball[mc] = jpout
             mc += 1
+            
         end
 
     elseif iterate == "nodes"
@@ -306,11 +294,10 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
     else
 
         println("$('-'^75)")
-        printstyled("Performing single probability query ...\nListing conditional probabilities for all states of $f ...\n", color=:green)
+        printstyled("Performing single probability query ...\nList will include conditional probabilities for all states of $f ...\n", color=:green)
 
-        probout, jpout = ConProb(; f=f, g=g, gs=gs, vars=vars, verbose=true, rr_bootstrap=0)
-        println("===>", probout, "  ", jpout)
-
+        probout, jpout = ConProb(; f=f, g=g, gs=gs, vars=vars, verbose=true, rr_bootstrap=0)        
+        
         gso = replace(gs, "1" => "2", "2" => "1")
         probout_o, jpout  = ConProb(; f=f, g=g, gs=gso, vars=vars, verbose=false, rr_bootstrap=0);        
         
@@ -336,33 +323,14 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
 
             absrisk = round(rrr/tpf, digits=4)
 
-            CI95, PRdist, RRest = bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=scoring_method, f=f, fs=fs, g=g, gs=gs, bootstrap=0, iterate="", minfreq=0.00, verbose=false, rr_bootstrap=rr_bootstrap, bootstrap_method=bootstrap_method, boot_plot=boot_plot, confmeth=confmeth)
+            CI95, PRdist, RRest = bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=scoring_method, f=f, fs=fs, g=g, gs=gs, bootstrap=0, iterate="", minfreq=0.00, verbose=false, rr_bootstrap=rr_bootstrap, bootstrap_method=bootstrap_method, boot_plot=boot_plot)
 
-             
-            
             ARdist  = sort(PRdist ./ tpf)
+            ARest   = round(median(ARdist), digits=4)
+            ARupper = round(ARdist[ Int(floor(length(ARdist) * 0.975)) ], digits=4)
+            ARlower = round(ARdist[ Int(ceil(length(ARdist) * 0.025)) ], digits=4)
+            tpf     = round(tpf, digits = 6)
 
-            if (confmeth == "normal")
-
-                ARest = round(median(ARdist), digits=4)
-                ARstd = std(ARdist)
-                ARlower, ARupper = round.(confint(OneSampleTTest(ARest, ARstd, length(ARdist), 0.05 )), digits=4)
-
-                if ARlower < 0
-                    ARlower = 0.0
-                end
-#       println(ARlower, "    ", ARupper)                                
-                elseif (confmeth == "empirical")
-
-                ARest   = round(median(ARdist), digits=4)            
-                ARupper = round(ARdist[ Int(floor(length(ARdist) * 0.975)) ], digits=4)
-                ARlower = round(ARdist[ Int(ceil(length(ARdist) * 0.025)) ], digits=4)
-
-            end
-            
-            tpf = round(tpf, digits = 6)
-            RRest = round(RRest, digits=4)
-            
             pconds = join(g .* "=" .* gs , ", ")
             fcond = f * "=" * fs
             oconds = join(g .* "=" .* gso, ", ")
@@ -382,12 +350,6 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
             println("    P($fcond) = $tpf; (baseline)\n")
             printstyled("    Network propagated Absolute Risk Ratio: $absrisk\n", color=:cyan)
             printstyled("    Bootstrap Absolute Risk Distribution:   $ARest  CI95 ($ARlower, $ARupper)\n", color=:cyan)
-
-#            if (absrisk < ARlower) || (absrisk > ARupper) || (RR < CI95[1]) || (RR > CI95[2])
-#                printstyled("\nINFO:\nRisk estimate(s) from input data fall outside the resampled distribution.\n", color=:grey)
-#                printstyled("This often means there are few, if any, samples for the requested query\nor that too few bootstraps were performed.\n", color=:yellow)
-#            end
-            
             println("$('-'^75)")
 
             if length(bootout) > 0
@@ -395,10 +357,8 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
                 cvl = ""
                 for i in eachindex(g)
                     cvl = cvl * string(g[i]) * "=" * string(gs[i]) * ","
+                    cvl = cvl[1:end-1]
                 end
-
-                cvl = cvl[1:end-1]
-
                 RRlower = CI95[1]
                 RRupper = CI95[2]
                 OUT = open(bootout, "a")

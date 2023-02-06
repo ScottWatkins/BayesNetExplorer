@@ -10,12 +10,12 @@ function getcounts(df_cpt, dfc, target_state)
     t = split(target_state, "_")
     fs = string(t[end])
 
-    if occursin(r"(2)|(true)|(yes)"i, fs)
+    if occursin(r"(2)|(true)|(yes)|(M)"i, fs)
         fs = "2"
-    elseif occursin(r"(1)(false)|(no)"i, fs)
+    elseif occursin(r"(1)(false)|(no)|(F)"i, fs)
         fs = "1"
     else
-        error("If X is a target, the target-state for true can be X_true, X_yes, or X_2 (case insensitive).\n Only two-state variables are allowed for risk calculations")
+        error("If X is a target, the target-state for true can be X_true, X_yes, or X_2 (case insensitive).\n Only two-state variables are allowed for risk calculations. Variable states should conform to 2/true/yes and 1/false/no.")
     end
     
     #println("^^", fs)

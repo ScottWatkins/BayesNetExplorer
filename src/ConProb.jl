@@ -4,12 +4,12 @@
 function ConProb(;f="", g=g, gs=gs, type="conditional", vars=vars, verbose=false, rr_bootstrap=rr_bootstrap) # get P(feature|g1, g2, ... gn)
 
     if length(g) != length(gs)
-        println("g was: ", length(g), " gs was: ", length(gs))
-        error("Please define a state for each conditional feature!")
+        println("\nMismatched conditional query:\ng elements: ", length(g), " but gs elements: ", length(gs))
+        error("\nPlease match each conditional feature with a conditional state!\n\n")
     end
 
     if !issubset(g, vars)
-        error("At least one input values ($g) is not a known variable!")
+        error("\n\nAt least one input values ($g) is not a known variable!\n\n")
     end
 
     q = "\'"
@@ -31,8 +31,10 @@ function ConProb(;f="", g=g, gs=gs, type="conditional", vars=vars, verbose=false
     gstates = join(["c(", gstates[2:end], ")"] , "") # done creating strings 
     R"f <- $feature"
     R"g <- $gnodes"; R"gs <- $gstates"
-    R"ev_net1 <- setEvidence(pnet, nodes = $g, states = $gs )"   #set states
-    grq = rcopy(R"grq = querygrain(ev_net1, nodes = $f, type=$type)"); #P(feature|g1,g2,...)
+    R"ev_net1 <- setEvidence(pnet, nodes = $g, states = $gs, propagate=TRUE )"   #set states
+    grq = rcopy(R"grq = querygrain(ev_net1, nodes = $f, type=$type)");
+
+    #Note: ev_net1 is propagated and qrq query P(feature|g1,g2,... is from the propagated net)
 
     if verbose == true
         println("$('-'^75)")
@@ -41,14 +43,14 @@ function ConProb(;f="", g=g, gs=gs, type="conditional", vars=vars, verbose=false
         println("$('-'^75)")
     end
     
-    probout = round.(grq, digits=6)
+    probout = round.(grq, digits=8)
 
-    qout = join([f, probout, join(string.(g), ","), join(string.(gs), ",") ], "|")
+    jpout = join([f, probout, join(string.(g), ","), join(string.(gs), ",") ], "|")
 
     if rr_bootstrap > 0
-        qout = probout
+        jpout = probout
     end
 
-    return qout
+    return probout, jpout
 
 end

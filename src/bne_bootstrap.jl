@@ -38,27 +38,25 @@
 
 
 """
-function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=scoring_method, f=f, fs=fs, g=[], gs=[], bootstrap=0, iterate="", minfreq=0.00, verbose=false, rr_bootstrap=rr_bootstrap, bootstrap_method=boostrap_method)
+function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=scoring_method, f=f, fs=fs, g=[], gs=[], bootstrap=0, iterate="", minfreq=0.00, verbose=false, rr_bootstrap=rr_bootstrap, bootstrap_method=boostrap_method, boot_plot=boot_plot, confmeth=confmeth)
 
-    if rr_bootstrap < 10
-        error("For accuracy, please use at least 10 rr_bootstrap replicates.")
+    if rr_bootstrap < 100
+        error("For accuracy, please use at least 100 rr_bootstrap replicates.")
     end
     
     if impute == true || bootstrap > 0 || length(iterate) > 0
-        error("Imputation, iteration, and network bootstrapping not yet implemented.")
+        error("Imputation and iteration with network bootstrapping not yet implemented.")
     end
 
     R"library(bnstruct)";  R"library(qgraph)"; R"library(gRain)"
-    
     vardat = readlines("$header")
     headdat = replace(readline("$header"), "\"" => "")
     headdat = String.(split(headdat, r"\s+"))
     numstates = parse.(Int64, split(vardat[2]))
     types = split(vardat[3])
     
-        dfcleaned, df_freq = clean_dfvars_by_frequency("$data", minfreq; nolabels=true, delim=" ", header=headdat)
+    dfcleaned, df_freq = clean_dfvars_by_frequency("$data", minfreq; nolabels=true, delim=" ", header=headdat)
 
-    
     RRdist = Float64[]   
     PRdist = Float64[]
     fs = parse(Int, fs)
@@ -73,19 +71,22 @@ function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=sco
 
         z == rr_bootstrap ? println() : print(".")
 
-        bd = Matrix(dfcleaned)
-        
+        bd = vcat(dfcleaned, dfcleaned)
+
+        # Randomly resample all rows and write to file
         if bootstrap_method == "resample"
-            bd = bd[sample(axes(bd, 1), size(bd,1); replace = true, ordered = false), :]
+            bd = bd[rand(1:nrow(bd), size(bd,1)), :]           
         elseif bootstrap_method == "jackknife"
-            nof = Int(size(bd,1)/2)
-            bd = bd[sample(axes(bd, 1), nof), :]
+            nof = Int(floor((size(bd,1)/2)))
+            bd = bd[rand(nof, size(bd,1)), :]
         end
 
-        writedlm("bd_$z", bd, " ")
-
+        bd = Matrix(bd)
         bd_z = "bd_$z"
-        @suppress R"dataset <- BNDataset( $bd_z, $header, starts.from = 1)";  #must use 1-based variables
+        writedlm("bd_$z", bd, " ") #resampled data
+
+        @suppress R"dataset <- BNDataset( $bd_z, $header, starts.from = 1)";   #1-based variables only
+
         vars = rcopy(R"vars <- variables(dataset)");
 
         if impute == true
@@ -123,37 +124,53 @@ function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=sco
         @suppress R"gn <- as(dadjm, 'graphNEL')";                 # non-boot DAG matrix to graphNEL
         @suppress R"ecpt <- extractCPT(df, gn, smooth = 0.01)";   # extract CPT from data, smooth NaN  
         @suppress R"pt <- compileCPT(ecpt)";
-        @suppress R"pnet <- grain(pt, propagate=T)";              # make cpt net, propagated, copy
+        @suppress (R"pnet <- grain(pt, propagate=TRUE)");         # make cpt net, propagated, copy
 
+        if boot_plot == true
+            adjM = rcopy(R"dadjm <- net@dag")
+            adjM = Int.(adjM)
+            plt = plot_network(adjM, "BN.header", fnode=f, gnodes=g )
+            display(plt)
+        end
+        
         gso = replace(gs, "1" => "2", "2" => "1")
 
         check = unique(gso)
         if length(check) > 2
-            error("Only 2-state variables are currently allowed.")
+            error("Only 2-state conditional variables are currently allowed. Target can be multistate.")
         end
-        
-        probout = ConProb(; f=f, g=g, gs=gs, vars=vars, verbose=false, rr_bootstrap=rr_bootstrap);
 
-        probout_o = ConProb(; f=f, g=g, gs=gso, vars=vars, verbose=false, rr_bootstrap=rr_bootstrap);
-        
+        probout, jpout = ConProb(; f=f, g=g, gs=gs, vars=vars, verbose=false, rr_bootstrap=rr_bootstrap);
+
+        probout_o, jpout  = ConProb(; f=f, g=g, gs=gso, vars=vars, verbose=false, rr_bootstrap=rr_bootstrap);
+
         RR_all = probout ./ probout_o
 
-        push!(RRdist, RR_all[fs])
-        push!(PRdist, probout[fs])
+        push!(RRdist, RR_all[fs])    #bootstrapped Relative Risk ratios
+        push!(PRdist, probout[fs])   #bootstrapped probabilities
         
         R"rm(list = ls())"    #clear R workspace each run
+        rm("bd_$z")
 
     end
-    
+
     RRdist = sort(RRdist)
-    upper = RRdist[ Int(floor(length(RRdist) * 0.975)) ]
-    lower = RRdist[ Int(ceil(length(RRdist) * 0.025)) ]
-    
-    CI95 = (round(lower, digits=4), round(upper, digits=4))
-    RR_est = round(mean(RRdist), digits=4)
-    run(`bash -c "rm -f bd_*"`)
+    RRdiststd = std(RRdist)
+
+    if confmeth == "normal"
+        RR_est = mean(RRdist)
+        lower, upper = confint(OneSampleTTest(RR_est, RRdiststd, rr_bootstrap), 0.05)
+        if lower < 0
+            lower = 0.0
+        end        
+        CI95 = (round(lower, digits=4), round(upper, digits=4))
+    elseif confmeth == "empirical"
+        RR_est = median(RRdist)
+        upper = RRdist[ Int(floor(length(RRdist) * 0.975)) ]
+        lower = RRdist[ Int(ceil(length(RRdist) * 0.025))  ]
+        CI95 = (round(lower, digits=4), round(upper, digits=4))
+    end
     
     return CI95, PRdist, RR_est
 
 end
-

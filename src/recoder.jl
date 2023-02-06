@@ -42,7 +42,7 @@ function recoder(d::Union{String,DataFrame}; recode12=false, recode_bool=false, 
         if in(0, unique(d[:,2]) ) 
             if !in(2, unique(d[:,2]) )
                 println("Found values: ", unique(d[:,2]), " for first variable.")
-                error("\n\nInput data appears to be boolean. Use recode_bool to format strictly 0/1 true/false data, or replace boolean column data with strings (e.g. Y/N) in mixed data sets\n\n")
+                error("\n\nInput data appears to be Boolean. Use recode_bool=true to format a strictly 0/1 or true/false data set. Alternatively, boolean column data can be reformated to  strings (e.g. Y/N). Except for ids (column 1), input data must be uniformly Boolean or String type. \n\n")
             end
 
             if maximum(d[!, 2:5]) > 1

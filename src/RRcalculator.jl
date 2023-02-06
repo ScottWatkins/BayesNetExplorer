@@ -1,37 +1,36 @@
 """
-    RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::Float64, translation_table::DataFrame=tt, mincondcount::Int=20, minp::Float=0.01, maxp=0.99)
+    RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::Float64, translation_table::DataFrame=tt, mincondcount::Int=20, minp::Float=0.0, maxp::Float=1.0)
 
-Calculate the relative and absolute risk ratios from a probability table generated with the bne function. Process and sort all targets and target conditions. Users can apply filters to help remove low confidence conditional probabilities. All variables in the input table must have exactly two states (e.g. 0/1 or true/false). 
+Calculate the relative and absolute risk ratios from a conditional probability table generated with the bne function. Process and sort all targets and target conditions. Users may apply filters to help remove low confidence conditional probabilities. All conditional variables in the input table must have exactly two states (e.g. 0/1 or true/false). The target variable can be multistate.
 
 All required inputs are generated from the bne() function. These include the main conditional probability table, the target state, the observed frequency of the target state, and the variable translation table. 
 
-Note: mincondcount is set to 20 by default and may need to be set to a lower value if a small data set is analyzed (see discussion section in the manual).
+Notes:
+1) mincondcount is set to 20 by default and may need to be set to a lower value if the data set is small or the target variable state has a low frequency (see discussion section in the manual).
+2) Combinations of  mutually exclusive (e.g., hot one encoded) combinations produce that produce zero counts will be omitted from the output.
 
-Options:
+    Options:
 
-minp             minimum probability to report    [0.01]
-maxp             maximum probability to report    [0.99]
-filterstates           remove any row with any conditional variables sets containing this value    []
-                 Typically Used to remove falses and see only states where the conditional is true
-mincondcount         report results with at least this many samples in the *conditional* subset    [20]
+        minp            minimum probability to report    [0.00001]
+        maxp            maximum probability to report    [0.99999]
+        filterstates    remove conditional variables     ""
+        keep            keep conditional variable        ""
+        mincondcount    min conditional subset count     [20]
 
-Example:
+    Example:
 
-RRcalculator(cpt, target\\_state="Mortality\\_true", target\\_state\\_freq=0.001, translation\\_table=dft, filterstates="", keep="",  mincondcount=20, minp=0.01, maxp=0.99 )
-
-
+        RRcalculator(cpt, target_state="Mortality_true", target_state_freq=0.01, translation_table=tt)
 
 """
-function RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::Float64, translation_table::DataFrame, filterstates::String="", keep::String="", minp::Float64=0.01, maxp::Float64=0.99,  mincondcount::Int=1)
+function RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::Float64, translation_table::DataFrame, filterstates::String="", keep::String="", minp::Float64=0.00001, maxp::Float64=0.99999,  mincondcount::Int=1)
 
     if length(target_state_freq) < 1
         error("You must provide the baseline frequency of the target state observed in the whole dataset.\nThis is the population frequency over all samples.\n")
     end
 
-    if size(cpt, 1) < 3
-        error("\n\nRRcalculator iterates over two or more conditional traits.\nPlease add additional traits, or use bne to estimate\nthe relative risk for a single conditional feature.\n\n")
+    if size(cpt, 1) < 2
+        error("\n\nRRcalculator iterates over two or more target queries.\nPlease add additional queries, or use bne(... relrisk=true) to estimate\nthe relative risk for a single target query.\n\n")
     end
-    
     
     df_cpt = copy(cpt)
 
@@ -59,7 +58,7 @@ function RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::F
         
     end
 
-    insertcols!(df_cpt, 4, "Prob(X)|(~Y)" => opp_prob)
+    insertcols!(df_cpt, 4, "P($target_state|!Y)" => opp_prob)
     rr = df_cpt[!, Symbol(target_state)] ./ opp_prob
     insertcols!(df_cpt, 5, :RelRiskRatio => rr)
 
@@ -123,10 +122,14 @@ function RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::F
         df_cpt = select(df_cpt, Not(2))
     end
 
-    nn = join(["P(", target_state, ")|Y"], "")
+    nn = join(["P(", target_state, "|Y)"], "")
     rename!(df_cpt, Symbol(target_state) => nn)
     
     df_cpt[!,2:6] = round.(df_cpt[!, 2:6], digits=4)
+
+    rename!(df_cpt, :ConditionalVariables  => :CondVariables)
+    rename!(df_cpt, :ConditionalStateNames => :CondStateNames)
+    rename!(df_cpt, :ConditionalStates     => :CondStates)
 
     return df_cpt
     

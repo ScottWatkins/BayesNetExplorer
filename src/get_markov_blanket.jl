@@ -28,8 +28,22 @@ function get_markov_blanket(DAG::Matrix, features::Array{String}, target::Union{
             end
         end
     end
+
+    mbn = []
     
-    return (mb)
+    for i in 1:size(mb,1)
+        if length(findall(mb[i,:] .> 0)) > 0
+            push!(mbn,i)
+        end
+        if length(findall(mb[:,i] .> 0)) > 0
+            push!(mbn,i)
+        end
+    end
+
+    mbnames = features[mbn]
+    mbnames = sort(unique(mbnames))
+
+    return (mb, mbnames)
     
 end
 

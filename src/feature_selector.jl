@@ -1,23 +1,27 @@
 """
-    dffs, baseprobs  = feature_selector(filename;  f="target", features=[], ids=[], net="random", netsize=3, relrisk=false, rr_boostrap=500)
+    dffs, baseprobs  = feature_selector(datatable.csv;  f="target" features=[], ids=[], net="random", netsize=6, relrisk=false, rr_bootstrap=500)
 
 Test every feature as a conditional variable, one-by-one, against a target feature. Iterate over all feature states. Measure the relative change to the baseline probability of the target variable when conditioned on the feature.
 
-All probabilities are network propagated with BNE. By default, the each network contains the target, the conditional variable, and two randomly generated two-state variables. The user may select up to five random variables.  Multi-state random variables can be created. Alternatively, variables can be selected randomly from the data set itself (e.g. net="select" netsize=5).
+The input file is a table of data with obseravation in row and variable/features in columns.  Column 1 must contain the ids and every column labelled. There should be at least 6 variables to test.
 
-This function returns a data frame (df) of conditional probabilities and the base probabilities of the target states.  When relrisk=true and net="random", relative and absolute risk ratios with their CI95s are calculated. Relative risk estimate is recorded as the mean value of the bootstrap distribution. It may be necessary to set the netsize to more than the default value if a graph error occurs.
+All probabilities are network propagated with BNE using the "sm" exact algorithm. Each network will contain the target, the conditional variable, and randomly generated two-state variables. Multi-state random variables can also be selected. Alternatively, variables can be selected randomly from the data set itself (e.g. net="select").
+
+This function returns a data frame (df) of conditional probabilities and baseline probabilities of the target states.  When relrisk=true and net="random", relative and absolute risk ratios with their CI95s are calculated. Relative risk estimates are recorded as the mean value of the bootstrap distribution. It may be necessary to set the netsize to more than the default value if a graph error occurs.
 
 You can use the format_file() function to first create a data frame, a list of ids, and a list of features for input. This data frame can be used for input if the ids are passed to the ids keyword. A subset of features in an input dataframe may be specified in a array (e.g. features=["Age", "Weight"] ) 
 
 Notes: \\
 
-1. Runtimes will increase with increasing netsize. If the frequencies of some variable states are very low, the conditional probability estimates may have high variance. The function implements the SM algorithm and BIC network scoring only.
+1. Runtimes will increase with netsize. If the frequencies of some variable states are very low, the conditional probability estimates may have high variance. The function implements the SM algorithm and BIC network scoring only.
 
-2. feature_selector() calculates the absolute and relative risk estimates as the mean value of the bootstrap estimates which are typically similar to or lower than the exact network propagated value from bne, if the conditional sample size is sufficient. Use bne() to obtain final estimates for absolute and relative risk.
-
+2. feature_selector() calculates the absolute and relative risk estimates as the mean value of the bootstrap estimates which should be similar to the exact network propagated value from bne if the conditional sample size is sufficient. Feature_selector help to decide what feature to include in a final network. Use bne() to construct the final network and obtain estimates for absolute and relative risks based on that final network.
 """
-function feature_selector(filename::Union{String,DataFrame}=""; f::String="",  features::Array=[], ids::Array=[], net::String="random",  netsize::Int64=4, randvarstates::Int64=2, relrisk::Bool=false, rr_bootstrap::Int64=0)
+function feature_selector(filename::Union{String,DataFrame}=""; f::String="",  features::Array=[], ids::Array=[], net::String="random",  netsize::Int64=6, randvarstates::Int64=2, relrisk::Bool=false, rr_bootstrap::Int64=500)
 
+    results=[]
+    distributions = Dict()
+    
     if typeof(filename) == DataFrame
         if length(unique(filename[!,1])) < size(filename,1)
             if length(ids) == size(filename,1)
@@ -29,26 +33,31 @@ function feature_selector(filename::Union{String,DataFrame}=""; f::String="",  f
                 error("The ids array must match the data frame.")
             end
         end
-    end
-    
-    if net == "random"
-        println("Generating nets with netsize of $netsize")
-    elseif net == "select" && ( netsize > (size(filename, 2) - 1) )
-        error("\n\nNet size must not exceed the total number of variables.\n\n")
-    elseif netsize < 4
-        error("\n\nNetsize must be at least four for random propagation.\n")
+        
+    elseif isfile(filename)
+        dfin = CSV.read(filename, DataFrame, header=true)
+        features = names(dfin)[2:end]
+        ids = dfin[!,1]
     else
+        error("Input must be a complete table with ids and labeled columns or a dataframe. If using a dataframe, you must supply ids and features.")
     end
 
-    if 0 < rr_bootstrap < 500
-        error("\n\nUse at lease 500 bootstraps to create stable CI95 estimates!\n\n")
-    elseif rr_bootstrap >= 500 && relrisk == false
+    if net == "random"
+        println("Generating nets with netsize of $netsize")
+    elseif   netsize >= (size(filename, 2) - 1) 
+        error("\n\nThe total number of test variables must be greater than the requested netsize ($netsize).\n\n")
+    elseif netsize < 6
+        error("\n\nNetsize should be at least six for random propagation.\n")
+    else
+    end
+    
+    if 0 < rr_bootstrap < 100
+        error("\n\nUse at least 100 bootstraps to create CI95 estimates, 1000 bootstraps are recommended!\n\n")
+    elseif rr_bootstrap >= 100 && relrisk == false
         error("\n\nSet relrisk=true to perform bootstrap analysis.\n\n")
     else
     end
-    
-    results=[]
-    
+        
     if length(f) > 0
         println("Testing target variable $f conditionally with all provided variables...")
     else
@@ -61,7 +70,13 @@ function feature_selector(filename::Union{String,DataFrame}=""; f::String="",  f
     println("Getting baseline probabilities...")
 
     fidx = findall(x->x == f, names(df_all))
-    fidx = fidx[1]
+
+    if length(fidx) == 0
+        error("\n\nDid not find requested target $f in the data!\n")
+    else
+        fidx = fidx[1]
+    end
+    
     fcols = [1, fidx]
     fsc = length(unique( df_all[!, fidx ] )) #feature state count
 
@@ -136,7 +151,7 @@ function feature_selector(filename::Union{String,DataFrame}=""; f::String="",  f
 
             cpt, dft, tf, adj, mbM, probout = bne("BN.data", "BN.header", f=f, g=g, gs=gs);
 
-            if (net == "random") && (netsize < 7) && (netsize > 3) && (relrisk == true)
+            if (net == "random") && (netsize < 10) && (netsize > 3) && (relrisk == true)
                 
                 fstates = sort(fstates)
 
@@ -146,7 +161,7 @@ function feature_selector(filename::Union{String,DataFrame}=""; f::String="",  f
 
                     cpt, dft, tf, adj, mbM, probout= bne("BN.data", "BN.header"; algo="sm", scoring_method="BIC", f=f, g=g, gs=gs)
                     
-                    CI95, PRdist, RR_est = bne_bootstrap("BN.data", "BN.header"; impute=false, algo="sm", scoring_method="BIC", f=f, fs=fs, g=g, gs=gs, bootstrap=0, iterate="", minfreq=0.00, verbose=false, rr_bootstrap=rr_bootstrap, bootstrap_method="resample")
+                    CI95, PRdist, RR_est = bne_bootstrap("BN.data", "BN.header"; impute=false, algo="sm", scoring_method="BIC", f=f, fs=fs, g=g, gs=gs, bootstrap=0, iterate="", minfreq=0.00, verbose=false, rr_bootstrap=rr_bootstrap, bootstrap_method="resample", boot_plot=true)
                     
                     println("Relative risk ratio: ", RR_est, " ", CI95)
                     push!(rrd, RR_est, CI95[1], CI95[2])
@@ -162,10 +177,12 @@ function feature_selector(filename::Union{String,DataFrame}=""; f::String="",  f
                     push!(ard, AR_est, ARlower, ARupper)
                     println("Absolute risk ratio: $AR_est, ($ARlower, $ARupper)")
 
+                    distributions[i] = PRdist
+
                 end
                 
-            elseif net == "random" && (netsize < 3 || netsize > 7) && relrisk == true
-                error("\n\nDue to graph construction and speed limitation, netsize should be set between 4 and 7 for bootstrapping.\nPlease also make sure there are at least 4 variables in the input data.\n\n")
+            elseif net == "random" && (netsize < 3 || netsize > 10) && relrisk == true
+                error("\n\nDue to graph construction and speed limitation, netsize should be set between 4 and 10 for bootstrapping.\nPlease also make sure there are at least 4 variables in the input data.\n\n")
             end
             
             probout = split(probout, "|")  
@@ -227,6 +244,6 @@ function feature_selector(filename::Union{String,DataFrame}=""; f::String="",  f
     
     printstyled("Network-propagated baseline probabilities of target states for $f: $baseline\n", color=:green)
 
-    return df_out, baseline
+    return df_out, baseline, distributions
 
 end
