@@ -1,7 +1,7 @@
 name = "BayesNetExplorer"
-uuid = "dca4ed0a-a93c-4845-9996-6581d99b4116"
-authors = ["Scott Watkins and Javier Hernandez"]
-version = "0.1.0"
+uuid = "d2014824-cbb4-407f-a93a-fdf131677a3f"
+authors = ["Scott Watkins  <scott.watkins@genetics.utah.edu>"]
+version = "0.3.0"
 
 [deps]
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
@@ -9,19 +9,22 @@ Combinatorics = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+Glob = "c27321d9-0574-5035-807b-f59d2c89b15c"
 GraphRecipes = "bd48cda9-67a9-57be-86fa-5b3c104eda73"
+HypothesisTests = "09f84164-cd44-5f33-b23f-e6b0d136a0d5"
 Impute = "f7bf1975-0170-51b9-8c5f-a992d46b9575"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+OhMyREPL = "5fb14364-9ced-5910-84b2-373655c76a03"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 RCall = "6f49c342-dc21-5d91-9882-a32aef131414"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 Suppressor = "fd094767-a336-5f1f-9728-57cf17d0bbfb"
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
-julia = "1.7"
+julia = "1.8"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
