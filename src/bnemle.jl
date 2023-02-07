@@ -55,7 +55,7 @@ function bnemle(data::Union{String,DataFrame}, query::String; digits::Int64=4, k
         
             if !in(tstate, df[!, target])
                 tv = unique(df[!, target])
-                printstyled("\nWARNING: Target state $tstate not found in $target:\nVariables states: $v.\nUsing Laplace correction (k=1) for $target=$tstate", color=:cyan)
+                printstyled("\nWARNING: Target state $tstate not found in $target:\nVariables states: $v.\n", color=:cyan)
             end
         
         end
@@ -67,11 +67,12 @@ function bnemle(data::Union{String,DataFrame}, query::String; digits::Int64=4, k
             ff = split(z[2][i], "=")
             feature = String.(ff[1])
             fstate = String.(ff[2])
-
+#println("===>", feature, " is ", fstate)
             if !in(fstate, df[!, feature])
                 fv = unique(df[!, feature])
                 ft = typeof(fstate)
-                error("\nERROR: Input feature state $fstate with type=$ft not found in $feature:\nVariables states: $fv.\n")
+                printstyled("\nWARNING: The feature state $fstate ($ft) was not found in $feature:\nObserved variables states were: $fv.\nThe conditional query is not valid, but an adjusted value may
+still be reported when this warning comes from a resampled dataset.\n", color=:yellow)
             end
 
             q = q * "df." * feature * ".==" * "\"" * fstate * "\"" * ","
