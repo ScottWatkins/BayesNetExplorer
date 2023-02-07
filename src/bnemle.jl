@@ -3,13 +3,16 @@
 
 Calculate the maximum likelihood probablity and CI95 for a target given some conditional variables.
 Inputs are a full csv file or dataframe and the probability query.
-Currently, only binary conditional variables are allowed. Laplace corrected risk ratios are provided.
+Currently, only binary conditional variables are allowed. Laplace corrected risk ratios are provided (rounded at print time).
 
     Keyword options:
         digits           Round to n digits            [4]    
         outfile          Output file                   ""  
         bootstraps       Number of replicates       [100]  
         k                Laplace correction factor    [1]  
+                         Wilson midpoint for binomial
+                         data set k=2
+
 """
 function bnemle(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::Number=1, outfile::String="", bootstraps::Int64=0)
 
@@ -147,12 +150,14 @@ still be reported when this warning comes from a resampled dataset.\n", color=:y
         
         if cc == 0   #print only exact, non-bootstrap values
 
-            targ_f, t_feat_f, t_feat_f_fopp = rpad.(printformat.(round.((targ_f, t_feat_f, t_feat_f_fopp ), digits=digits), fmt=fmt), 10)
+            targ_f, t_feat_f, lp_targ_f, lp_t_feat_f,  t_feat_f_fopp, lp_t_feat_f_fopp = rpad.(printformat.(round.((targ_f, t_feat_f, lp_targ_f, lp_t_feat_f, t_feat_f_fopp, lp_t_feat_f_fopp ), digits=digits), fmt=fmt), 10)
+            
             abs_risk_ratio, lp_abs_risk_ratio = rpad.(printformat.(round.((abs_risk_ratio,lp_abs_risk_ratio), digits=digits), fmt=fmt), 10)
+            
             rel_risk_ratio, lp_rel_risk_ratio = rpad.(printformat.(round.((rel_risk_ratio,lp_rel_risk_ratio), digits=digits), fmt=fmt), 10)
             println(line)
             println("Counts:\n\tTarget (all)\t\t$targ_c\n\tTarget|Conditionals\t$t_feat_c\tConditionals only\t$all_c_cond\n\tTarget|!Conditionals\t$t_feat_c_fopp\t!Conditionals only\t$all_c_opp\n" )   
-            println("Frequencies:\n  Absolute risk (baseline)\t$targ_f\n  Targets|Conditionals          $t_feat_f\n  Targets|!Conditionals         $t_feat_f_fopp\n")    
+            println("Frequencies:\n  Absolute risk (baseline)\t$targ_f\t$lp_targ_f (adj)\n  Targets|Conditionals          $t_feat_f\t$lp_t_feat_f (adj)\n  Targets|!Conditionals         $t_feat_f_fopp\t$lp_t_feat_f_fopp (adj)\n")    
             println("Risk ratios:\n  ARR:\t$abs_risk_ratio\tARR (adj):\t$lp_abs_risk_ratio")
             println( "  RRR:\t$rel_risk_ratio \tRRR (adj):\t$lp_rel_risk_ratio")
             cc = cc + 1
