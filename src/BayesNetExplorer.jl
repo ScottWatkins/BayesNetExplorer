@@ -6,7 +6,8 @@ using StatsBase, Statistics, Random, Distributions, Combinatorics
 using HypothesisTests
 using Plots, GraphRecipes, RCall, Suppressor, Glob
 using LinearAlgebra, Impute
-using Printf, OhMyREPL
+using Printf
+using OhMyREPL
 
 export CSV
 export DataFrames
@@ -37,4 +38,6 @@ include("plot_network.jl")
 include("bnemle.jl")
 include("queryparser.jl")
 include("printformat.jl")
+include("moralizeDAG.jl")
+
 end

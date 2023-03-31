@@ -18,7 +18,7 @@
     
     Probability options with input example:
 
-        f            Target feature (required)         "F1"
+        f            Feature/Target variable (required) "F1"
         g            Given/Evidence features            ["F2", "F3"]
         gs           Given/Evidence  states             ["2",   "1"]
                      (Must be numeric string)
@@ -57,7 +57,7 @@
 
 
 """
-function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, g::Array=[], gs::Array=[], bootstrap=0, impute::Bool=false, iterate::String="", minfreq::Float64=0.00, verbose::Bool=false, relrisk::Bool=false, rr_bootstrap::Int=100, bootstrap_method::String="resample", bootout="",  DAG::Bool=false, plot::String="net", boot_plot::Bool=false, nolimit::Bool=false, confmeth::String="normal")
+function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, g::Array=[], gs::Array=[], bootstrap=0, impute::Bool=false, iterate::String="", minfreq::Float64=0.00, verbose::Bool=false, relrisk::Bool=false, rr_bootstrap::Int=100, bootstrap_method::String="resample", bootout="",  DAG::Bool=false, plot::String="net", boot_plot::Bool=false, nolimit::Bool=false, confmeth::String="normal", plotmethod::Symbol=:stress)
 
     if sum(occursin.(r" ", gs)) > 0
         error("\nSpaces are not allowed in the gs states: gs = $gs\n\n")
@@ -76,8 +76,7 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
     end
 
     if occursin(r"\b(sm|hc|mmhc|sem)\b", algo )
-    
-        println("Building bayes net using the $algo algorithm and the $scoring_method scoring method ...")
+        println("Building Bayes net using the $algo algorithm and the $scoring_method scoring method ...")
     else
         error("\n\nERROR: $algo is not an implemented algorithm.\n\n")
     end
@@ -104,7 +103,7 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
         limit = 1000
     else
         if length(headdat) > limit
-            error("\n\nBNE: Input >16 variables will have very long compute times.\nSelect up to 16 variables for exact network analysis.\nFor example, format_file(\"filename.csv\", datacols=[1,2,5,6,7]).\n\nLarge approximate networks can be made with using\ngreedy algorithms (e.g., algo=\"hc\") and setting nolimit=true.\nGreedy networks may differ from the more accurate exact networks.\n\n")
+            error("\n\nBNE: Input with >16 variables will have very long compute times.\nSelect up to 16 variables for exact network analysis.\nFor example, format_file(\"filename.csv\", datacols=[1,2,5,6,7]).\n\nLarge approximate networks can be made with using\ngreedy algorithms (e.g., algo=\"hc\") and setting nolimit=true.\nGreedy networks may differ from the more accurate exact networks.\n\n")
         end
     end
 
@@ -122,7 +121,7 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
     dfcleaned, df_freq = clean_dfvars_by_frequency("$data", minfreq; nolabels=true, delim=" ", header=headdat)
 
     #check input and features
-    println("Checking conditional variables and states ...")
+    println("Checking conditional variables and states...")
     for i in eachindex(g)
         if in(parse(Int64, gs[i]), dfcleaned[:, Symbol(g[i])])
             println("Conditional variable: ", g[i], " state: ", gs[i], " ... OK.")
@@ -199,17 +198,17 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
     mbM, mbnames = get_markov_blanket(adjM, dagnames, f)
 
     if plot == "mb"
-        mb_plt = plot_network(mbM, "BN.header", fnode=f, gnodes=g, DAG=DAG )
-        println("Displaying markov blanket plot of $f ...")
+        mb_plt = plot_network(mbM, headerfile="BN.header", fnode=f, gnodes=g, DAG=DAG, method=plotmethod )
+        println("Displaying Markov blanket plot of $f ...")
         println("Nodes for minimal Markov blanket for $f...")
         printstyled("$mbnames\n", color=:cyan)
         display(mb_plt)
         #savefig(mb_plt, "$f.markov.svg")
     elseif plot == "net"
-        plt = plot_network(adjM, "BN.header", fnode=f, gnodes=g, DAG=DAG ) #DAG in, converted if UG
+        plt = plot_network(adjM, headerfile="BN.header", fnode=f, gnodes=g, DAG=DAG, method=plotmethod ) #DAG in, converted if UG
         display(plt)
     else
-        println("Plot must be either net (entire net) or mb (markov blanket of target) or skip.")
+        println("Plot must be either net (entire net) or mb (Markov blanket of target) or skip.")
     end
     
     nodevals = rcopy(Int.(R"get.most.probable.values(net, prev.values = NULL)")) 
@@ -228,7 +227,7 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
     dftf = df_target.percent .* 0.01 #to frequency
 
     if length(dftf) == 0
-        error("Requested target not found. Check input!")
+        error("Requested target not found. Check input (f=\"target\")!")
     end
 
     df_j = leftjoin(df_freq, df_map, on=[:feature, :numstate])
@@ -248,8 +247,8 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
             printstyled("INFO: Iterating all; ignoring user-specified condititional states.\n", color=:yellow)
         end
         
-        if length(vars) > 20
-            error("Final variable count > 20: Too many variables to iterate all of them!")
+        if length(vars) > 15
+            error("Final variable count > 15: Too many variables to iterate all of them!")
         end
         
         if length(f) == 0
@@ -309,7 +308,7 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
         printstyled("Performing single probability query ...\nListing conditional probabilities for all states of $f ...\n", color=:green)
 
         probout, jpout = ConProb(; f=f, g=g, gs=gs, vars=vars, verbose=true, rr_bootstrap=0)
-        println("===>", probout, "  ", jpout)
+        #println("===>", probout, "  ", jpout)
 
         gso = replace(gs, "1" => "2", "2" => "1")
         probout_o, jpout  = ConProb(; f=f, g=g, gs=gso, vars=vars, verbose=false, rr_bootstrap=0);        
@@ -320,7 +319,7 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
             println("$('-'^75)")
             
             if fs == 0 || typeof(fs) == Int
-                error("\n\nPlease set the target state to bootstrap in string format (e.g. \"2\").\n")
+                error("\n\nPlease set the target state to bootstrap in string format (e.g. fs=\"2\").\n")
             elseif in( parse(Int64,fs), dfcleaned[:, Symbol(f)] )
                 println("Target: ", f, ", state: ", fs, " ... OK.")
             else

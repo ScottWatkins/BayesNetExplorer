@@ -38,9 +38,9 @@
 
 
 """
-function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=scoring_method, f=f, fs=fs, g=[], gs=[], bootstrap=0, iterate="", minfreq=0.00, verbose=false, rr_bootstrap=rr_bootstrap, bootstrap_method=boostrap_method, boot_plot=boot_plot, confmeth=confmeth)
+function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=scoring_method, f=f, fs=fs, g=[], gs=[], bootstrap=0, iterate="", minfreq=0.00, verbose=false, rr_bootstrap=rr_bootstrap, bootstrap_method=boostrap_method, boot_plot=boot_plot)
 
-    if rr_bootstrap < 100
+    if rr_bootstrap < 10
         error("For accuracy, please use at least 100 rr_bootstrap replicates.")
     end
     
@@ -49,6 +49,7 @@ function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=sco
     end
 
     R"library(bnstruct)";  R"library(qgraph)"; R"library(gRain)"
+    
     vardat = readlines("$header")
     headdat = replace(readline("$header"), "\"" => "")
     headdat = String.(split(headdat, r"\s+"))
@@ -70,23 +71,30 @@ function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=sco
         end
 
         z == rr_bootstrap ? println() : print(".")
+#        Experimental permution of variables
+#        rbd = dfcleaned
+#        rbd[:,f] = (sample(dfcleaned[:, f], size(dfcleaned,1)))
+#        for i in eachindex(g)
+#            rbd[:, g[i] ] = (sample(dfcleaned[:, g[i]], size(dfcleaned,1)))
+#        end
+#        bd = Matrix(rbd)
 
-        bd = vcat(dfcleaned, dfcleaned)
+        # Triplicate data and then resample because conditional subset will limit the
+        # resampling distribution resampling only one; proportions remain the same.
+        bd = Matrix(vcat(dfcleaned, dfcleaned, dfcleaned))
 
         # Randomly resample all rows and write to file
         if bootstrap_method == "resample"
-            bd = bd[rand(1:nrow(bd), size(bd,1)), :]           
+            bd = bd[sample(axes(bd, 1), size(dfcleaned,1); replace = true, ordered = false), :]            
         elseif bootstrap_method == "jackknife"
             nof = Int(floor((size(bd,1)/2)))
-            bd = bd[rand(nof, size(bd,1)), :]
+            bd = bd[sample(axes(bd, 1), nof), :]
         end
+                
+        writedlm("bd_$z", bd, " ")
 
-        bd = Matrix(bd)
         bd_z = "bd_$z"
-        writedlm("bd_$z", bd, " ") #resampled data
-
-        @suppress R"dataset <- BNDataset( $bd_z, $header, starts.from = 1)";   #1-based variables only
-
+        @suppress R"dataset <- BNDataset( $bd_z, $header, starts.from = 1)";  #must use 1-based variables
         vars = rcopy(R"vars <- variables(dataset)");
 
         if impute == true
@@ -124,12 +132,12 @@ function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=sco
         @suppress R"gn <- as(dadjm, 'graphNEL')";                 # non-boot DAG matrix to graphNEL
         @suppress R"ecpt <- extractCPT(df, gn, smooth = 0.01)";   # extract CPT from data, smooth NaN  
         @suppress R"pt <- compileCPT(ecpt)";
-        @suppress (R"pnet <- grain(pt, propagate=TRUE)");         # make cpt net, propagated, copy
+        @suppress R"pnet <- grain(pt, propagate=T)";              # make cpt net, propagated, copy
 
         if boot_plot == true
             adjM = rcopy(R"dadjm <- net@dag")
             adjM = Int.(adjM)
-            plt = plot_network(adjM, headerfile="BN.header", fnode=f, gnodes=g )
+            plt = plot_network(adjM, "BN.header", fnode=f, gnodes=g )
             display(plt)
         end
         
@@ -139,7 +147,7 @@ function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=sco
         if length(check) > 2
             error("Only 2-state conditional variables are currently allowed. Target can be multistate.")
         end
-
+        
         probout, jpout = ConProb(; f=f, g=g, gs=gs, vars=vars, verbose=false, rr_bootstrap=rr_bootstrap);
 
         probout_o, jpout  = ConProb(; f=f, g=g, gs=gso, vars=vars, verbose=false, rr_bootstrap=rr_bootstrap);
@@ -150,27 +158,18 @@ function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=sco
         push!(PRdist, probout[fs])   #bootstrapped probabilities
         
         R"rm(list = ls())"    #clear R workspace each run
-        rm("bd_$z")
+#        rm("bd_$z")
 
     end
 
     RRdist = sort(RRdist)
-    RRdiststd = std(RRdist)
 
-    if confmeth == "normal"
-        RR_est = mean(RRdist)
-        lower, upper = confint(OneSampleTTest(RR_est, RRdiststd, rr_bootstrap), 0.05)
-        if lower < 0
-            lower = 0.0
-        end        
-        CI95 = (round(lower, digits=4), round(upper, digits=4))
-    elseif confmeth == "empirical"
-        RR_est = median(RRdist)
-        upper = RRdist[ Int(floor(length(RRdist) * 0.975)) ]
-        lower = RRdist[ Int(ceil(length(RRdist) * 0.025))  ]
-        CI95 = (round(lower, digits=4), round(upper, digits=4))
-    end
-    
+    upper = RRdist[ Int(floor(length(RRdist) * 0.975)) ]
+    lower = RRdist[ Int(ceil(length(RRdist) * 0.025))  ]
+
+    CI95 = (round(lower, digits=4), round(upper, digits=4))
+    RR_est = round(median(RRdist), digits=4)
+
     return CI95, PRdist, RR_est
 
 end

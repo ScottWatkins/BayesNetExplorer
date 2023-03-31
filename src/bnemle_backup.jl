@@ -1,24 +1,24 @@
 """
-    bnemle(data, "P(A=a|B=b,C=c)" )
+    bnemle(data, "P(A=a|B=b)")
 
-Calculate the maximum probablity and CI95 for a target given some conditional variables. Here, maximum is used to refer to th maximum estimate given the data without using network propagation. Input a full csv file or dataframe. Column1 must contain observation labels, and all variables must be labeled. Missing data will be automatically omitted from the requested analysis. Currently, only binary conditional variables are allowed. Laplace corrected risk ratios are provided.
+Calculate the maximum likelihood probablity and CI95 for a target given some conditional variables.
+Inputs are a full csv file or dataframe and the probability query.
+Currently, only binary conditional variables are allowed. Laplace corrected risk ratios are provided (rounded at print time). Outfiles can be made for bootstrap runs.
 
     Keyword options:
-        digits           round to n digits                        [4]    
-        outfile          output file                              ""  
-        outfile2         single column output (arr, rrr)          ""   
-        bootstraps       number of replicates                     [100]  
-        k                laplace correction factor                [1]  
+        digits           Round to n digits                 [4]    
+        outfile          Output file                        ""  
+        outfile2         Single column output               ""   
+        bootstraps       Number of replicates            [100]  
+        k                Laplace correction factor         [1]  
                          (Set k=2 for Wilson midpoint)
-        mincount         min target and cond count flag           [1,20]
-        showids          show target ids for final estimate       false
+        mincount         min target and cond count flag [1,20]
+        showids          show target ids for query       false
 """
 function bnemle(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::Number=1, outfile::String="", bootstraps::Int64=0, mincount::Array=[1,20], showids=false, outfile2::String="")
 
-    line = "-"^75
-    
     if occursin(r"^P\(((.+)=(.+))\|((.+)=(.+))\)$", query)
-        println(line)
+        println("-"^70)
         println("Query:$query")
     else
         error("\n\nBad conditional query: \"$query\"\nQuery format is \"P(A=X|B=Y,C=Z,...)\"\n")
@@ -35,24 +35,18 @@ function bnemle(data::Union{String,DataFrame}, query::String; digits::Int64=4, k
         x =  Symbol(split(i, "=")[1])
         push!(newcols, x)
     end
-    
-    pushfirst!(newcols, Symbol(names(data)[1]))
 
     if typeof(data) == DataFrame     #read data
-        data = dropmissing(select(data, newcols))
         ids = data[!,1]
-        data = data[:,2:end]
-        global df = string.(data)
+        df = select(data, newcols)
+        global df = string.(df)
     elseif isfile(data)
-        data = CSV.read(data, DataFrame, normalizenames=true, types=String)
-        data = dropmissing(select(data, newcols))
         ids = data[!,1]
-        data = data[:,2:end]
-        global df = string.(data)
+        global df = CSV.read(data, DataFrame, normalizenames=true, types=String, select=newcols)
     else
         error("\nCannot find file or dataframe called $data.\n")
     end
-                
+
     global dfg = df  #MUST set a global dataframe here for resampling with eval!!!
     global cc = 0
     global bb = -1
@@ -98,7 +92,7 @@ still be reported when this warning comes from a resampled dataset.\n", color=:y
             if length(fstate_opp) == 1
                 fstate_opp = fstate_opp[1]
             else
-                error("More than two states found. Conditional variable are currenlty limited to two states.")
+                error("More than two states in selected feature.")
             end
 
             q_opp = q_opp * "df." * feature * ".==" * "\"" * fstate_opp * "\"" * ","
@@ -118,7 +112,7 @@ still be reported when this warning comes from a resampled dataset.\n", color=:y
         qid = "dfid[.&(" * oc  * "," * "dfid." * target * ".==\"" * tstate * "\"), 1]"
         dcall = Meta.parse(qid)
         tids = join(eval(dcall), ",")
-        
+
         q_opp = "df[ .&(" * q_opp[1:end-1] * "), :]"
 
         dcallopp = Meta.parse(q_opp)
@@ -179,6 +173,8 @@ still be reported when this warning comes from a resampled dataset.\n", color=:y
         abs_risk_ratio = t_feat_f / targ_f
         rel_risk_ratio =  t_feat_f / t_feat_f_fopp
 
+        line = "-"^70
+
         fmt = join(["%.", digits, "f"], "") #printf format string for printformat function
         
         if cc == 0   #print only exact, non-bootstrap values
@@ -189,7 +185,6 @@ still be reported when this warning comes from a resampled dataset.\n", color=:y
             
             rel_risk_ratio, lp_rel_risk_ratio = rpad.(printformat.(round.((rel_risk_ratio,lp_rel_risk_ratio), digits=digits), fmt=fmt), 10)
             println(line)
-            println("Valid observations: $all_c\n")
             println("Counts:\n\tTarget (all)\t\t$targ_c\n\tTarget|Conditionals\t$t_feat_c\tConditionals only\t$all_c_cond\n\tTarget|!Conditionals\t$t_feat_c_fopp\t!Conditionals only\t$all_c_opp\n" )   
             println("Frequencies:\n  Absolute risk (baseline)\t$targ_f\t$lp_targ_f (adj)\n  Targets|Conditionals          $t_feat_f\t$lp_t_feat_f (adj)\n  Targets|!Conditionals         $t_feat_f_fopp\t$lp_t_feat_f_fopp (adj)\n")    
             println("Risk ratios:\n  ARR:\t$abs_risk_ratio\tARR (adj):\t$lp_abs_risk_ratio")
@@ -199,6 +194,8 @@ still be reported when this warning comes from a resampled dataset.\n", color=:y
                 println(line)
                 println("WARN: Insufficient raw data for this query (using mincount = $mincount)")
             end
+
+
 
             cc = cc + 1
             println(line)
@@ -255,15 +252,15 @@ still be reported when this warning comes from a resampled dataset.\n", color=:y
 
                 if bb > 0
                     println("WARN: $bb/$bootstraps bootstraps had zero count states (laplace corrected).")
-                    println(line)
+                    println("-"^70)
                 end
                 
                 println("Distribution average and CI95 for $bootstraps bootstraps")
-                println(line)
+                println("-"^70)
                 println("Abs risk        $TF($TFlc, $TFuc)")
                 println("ARR             $ARR($ARRlc, $ARRuc)\nARR (adj)       $lp_ARR($lp_ARRlc, $lp_ARRuc)")
                 println("RRR             $RRR($RRRlc, $RRRuc)\nRRR (adj)       $lp_RRR($lp_RRRlc, $lp_RRRuc)")
-                println(line)
+                println("-"^70)
                 
                 if (length(outfile) > 0) || (length(outfile2) > 0)
                     
@@ -319,6 +316,7 @@ still be reported when this warning comes from a resampled dataset.\n", color=:y
                         end
 
                     end
+
 
                     v1 = vc[1]; v2 = vc[2]; v3=vc[3]; v4 = vc[4]
                     mintarg1 = vt[1]; mintarg2 = vt[2]; mintarg3 = vt[3]; mintarg4 = vt[4]; 

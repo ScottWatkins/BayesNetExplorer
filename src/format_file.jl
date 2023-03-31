@@ -22,7 +22,7 @@ ID,V1,V2,V3 \\
 
 Options: \\
 
-datacols: specify a subset of data columns with vector array []  \\
+datacols: specify columns in a vector array of symbols [:IDS, :VAR1, VAR2]  \\
 recode_bool: recode strictly 0/1 or true/false variables to 1/2 variables [false]  \\
 delim: set delimiter for data file input [","]  \\
 minfreq: the minimum frequency for any variable state [0.0]  \\

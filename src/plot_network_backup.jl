@@ -39,11 +39,11 @@ Notes:
    3. The edgelabels matrix will be automatically converted
       to symmetric if DAG=false.
 2. Input non-symetric matrices have directional arcs.
-      From row index -> to col index
-3. If the matrix is symmetrical, the graph is non-directional.      
+      Upper triangle: from row -> to col
+      Lower triangle: to row <- from col
 
 """
-function plot_network(adjM::Matrix; headerfile::String="", fnode::String="", gnodes::Array=[], bnodes::Array=[], cnodes::Array=[],  DAG::Bool=true,  nodeshape::Symbol=:rect, method::Symbol=:stress, trimnames::Int=10, fontsize::Number=5, nodesize::Float64=0.1, curves::Bool=false, dims::Int64=2, ncolors::Array=[:orange, :skyblue1, :lightgoldenrod1, :palegreen3, :grey80], moralize::Bool=false, nodenames::Array=[], curvescale::Float64=0.03, edgelabel::Array=[], edgewidth::Array=[], node_weights::Vector=[], boxcolor::Symbol=:white, linewidth::Float64=1.0)
+function plot_network(adjM::Matrix; headerfile::String="", fnode::String="", gnodes::Array=[], bnodes::Array=[], cnodes::Array=[],  DAG::Bool=true,  nodeshape::Symbol=:rect, method::Symbol=:stress, trimnames::Int=10, fontsize::Number=5, nodesize::Float64=0.1, curves::Bool=false, dims::Int64=2, ncolors::Array=[:orange, :skyblue1, :lightgoldenrod1, :palegreen, :grey80], moralize::Bool=false, nodenames::Array=[], curvescale::Float64=0.03, edgelabel::Array=[], edgewidth::Array=[], node_weights::Vector=[], boxcolor::Symbol=:white, linewidth::Float64=1.5)
     
 
     if isfile(headerfile)
@@ -147,9 +147,7 @@ function plot_network(adjM::Matrix; headerfile::String="", fnode::String="", gno
                 M[i, i] = 0.0 
             end
         end
-
         M = Int.(M)
-
         return M
     end
     
@@ -161,7 +159,6 @@ function plot_network(adjM::Matrix; headerfile::String="", fnode::String="", gno
         node_weights = rand([1.0], size(adjM,1)) 
     end
 
-    edgM = rand([1.5], size(adjM))
     
     if DAG == true
 
@@ -171,30 +168,54 @@ function plot_network(adjM::Matrix; headerfile::String="", fnode::String="", gno
 
         if moralize == true
 
-            adjM_moral, edgM = moralizeDAG(adjM)  #func to marry parents        
-            printstyled("Creating non-directional, moralized network...\n", color=:green)
+            adjM_moral = moralizeDAG(adjM)   #func to marry parents        
+
+            d = findall(adjM_moral .!= adjM) # make edgewidth matrix
+                                             # populate with default
+            for i in d                       # change moralized line
+                edgewidth[i] = 0.15          # to very thin
+            end
+            
             M = make_sym(adjM_moral)       #func to make symmetrical
+            printstyled("Creating non-directional, moralized network...\n", color=:green)
 
         else
 
             M = make_sym(adjM)
-            printstyled("INFO: Creating non-directional but non-moralized network...\n", color=:green)
-
+            printstyled("WARN: Creating non-directional but non-moralized network...\n", color=:yellow)
         end
 
     end
+
+    function make_sym2(E)
+        EN = string.(Int.(zeros(size(E,1), size(E,2))))
+        for i=1:size(E,1)
+            for j=1:size(E,2)
+                if E[i,j] != "0"
+                    EN[i,j] = E[i,j]
+                    EN[j,i] = E[i,j]
+                end
+            end
+            EN[i, i] = "0"
+        end
+        return EN
+    end
+
+    if DAG == false && size(edgelabel,1) > 0 
+        edgelabel = make_sym2(edgelabel)
+    end
     
-    graphplot(M,
+    gplt = graphplot(M,
               linewidth=linewidth,
-              names=nodenames,
               nodecolor=c,
               nodeshape=nodeshape,
               nodesize=nodesize,
               curves=curves,
               curvature_scalar=curvescale,
-              axis_buffer=0.1,
+              axis_buffer=0.15,
               linealpha = 0.99,
               dims=dims,
+              names=nodenames,
               fontsize=fontsize,
               shorten=0.0,
               edgelabel=edgelabel,
@@ -202,10 +223,11 @@ function plot_network(adjM::Matrix; headerfile::String="", fnode::String="", gno
               edge_label_box=true,
               self_edge_size=0.1,
               linecolor=boxcolor,    #for edge label box 
-              edgewidth=edgM,
+              edgewidth=edgewidth,
               node_weights=node_weights,
-              arrow=:closed,
               method=method
               )
+
+    return gplt
 
 end
