@@ -28,7 +28,7 @@ delim: set delimiter for data file input [","]  \\
 minfreq: the minimum frequency for any variable state [0.0]  \\
 
 """
-function format_file(infile::Union{String,DataFrame}; datacols::Array=[], delim::Union{String,Char}=",", minfreq::Float64=0.0, recode_bool::Bool=false, recode12::Bool=false)
+function format_file(infile::Union{String,DataFrame}; datacols::Array=[], delim::Union{String,Char}=",", minfreq::Float64=0.0, recode_bool::Bool=false, recode12::Bool=false, datafile="BN.data", headerfile="BN.header")
 
     if typeof(infile) == String
         if !isfile(infile)
@@ -66,26 +66,26 @@ function format_file(infile::Union{String,DataFrame}; datacols::Array=[], delim:
     if recode_bool == false
 
         BN = BN[!, 2:end]
-        CSV.write("BN.data", BN, delim=" ", header=false)
+        CSV.write(datafile, BN, delim=" ", header=false)
         dorc = [names(BN), length.(unique.(eachcol(BN))), repeat(["D"], inner=size(BN,2) )]
 
     elseif  recode_bool == true
 
         BN = BN[!, 2:end]
         BN[:,:] = replace.(BN[:,:], "true" => "2", "false" => "1")
-        CSV.write("BN.data", BN, delim=" ", header=false)
+        CSV.write(datafile, BN, delim=" ", header=false)
         dorc = [names(BN), length.(unique.(eachcol(BN))), repeat(["D"], inner=size(BN,2) )]
 
     else
         
         cols = names(df)[2:end]
         BN = df[:, 2:end]
-        CSV.write("BN.data", BN, delim=" ", header=false)
+        CSV.write(datafile, BN, delim=" ", header=false)
         dorc = [names(BN), length.(unique.(eachcol(BN))), repeat(["D"], inner=size(BN,2) )]
 
     end
     
-    OUT = open("BN.header", "w+")
+    OUT = open(headerfile, "w+")
 
     qd = join(["\"" *  i *  "\""  for i in names(BN)], " ")
     println(OUT, qd)
@@ -104,8 +104,8 @@ function format_file(infile::Union{String,DataFrame}; datacols::Array=[], delim:
         md = 1
         miss = size(BN, 1) - size(dropmissing(BN), 1)
         printstyled("INFO: Detected $miss rows with missing data. Please use the impute_dataframe function to impute the missing data!\n", color=:yellow)
-        rm("BN.header")
-        rm("BN.data")
+        rm(headerfile)
+        rm(datafile)
         error("Input data has missing data.")
 
     else

@@ -12,7 +12,7 @@ function recoder(d::Union{String,DataFrame}; recode12=false, recode_bool=false, 
 
     if typeof(d) == String && isfile(d) == true
         println("Reading data from file: $d")
-        d = CSV.read(d, DataFrame, delim=delim)
+        d = CSV.read(d, DataFrame, delim=delim, types=String)
     end
     
     col1name = Symbol(names(d)[1])

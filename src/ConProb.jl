@@ -1,7 +1,7 @@
 """
-    Dependent function. This function is used within bne.jl.
+    Dependent function. This function is used within bne.jl to calculate conditional probability. Note user defined rrr denominator is passed in as gs.
 """
-function ConProb(;f="", g=g, gs=gs, type="conditional", vars=vars, verbose=false, rr_bootstrap=rr_bootstrap) # get P(feature|g1, g2, ... gn)
+function ConProb(;f="", fs=fs, g=g, gs=gs, type="conditional", vars=vars, verbose=false, rr_bootstrap=rr_bootstrap) # get P(feature|g1, g2, ... gn)
 
     if length(g) != length(gs)
         println("\nMismatched conditional query:\ng elements: ", length(g), " but gs elements: ", length(gs))
@@ -35,10 +35,15 @@ function ConProb(;f="", g=g, gs=gs, type="conditional", vars=vars, verbose=false
     grq = rcopy(R"grq = querygrain(ev_net1, nodes = $f, type=$type)");
 
     #Note: ev_net1 is propagated and qrq query P(feature|g1,g2,... is from the propagated net)
-
+    c = ""
     if verbose == true
         println("$('-'^75)")
-        println("P($f)|$g\nConditional state(s): $gs\n")
+        for i in 1:length(g)
+            c = c * g[i] * "=" * gs[i] * ","
+        end
+        c = c[1:end-1]
+        
+        println("P($f=$fs|$c)\n")
         R"print(grq)"
         println("$('-'^75)")
     end

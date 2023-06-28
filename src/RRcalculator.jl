@@ -11,33 +11,36 @@ Notes:
 
     Options:
 
-        minp            minimum probability to report    [0.00001]
-        maxp            maximum probability to report    [0.99999]
-        filterstates    remove conditional variables     ""
-        keep            keep conditional variable        ""
-        mincondcount    min conditional subset count     [20]
+        minp            minimum probability to report         [0.00001]
+        maxp            maximum probability to report         [0.99999]
+        filterstates    remove conditional variables          ""
+        keep            keep conditional variable             ""
+        mincounts       min target and conditional counts     [1, 20]
 
     Example:
 
         RRcalculator(cpt, target_state="Mortality_true", target_state_freq=0.01, translation_table=tt)
 
 """
-function RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::Float64, translation_table::DataFrame, filterstates::String="", keep::String="", minp::Float64=0.00001, maxp::Float64=0.99999,  mincondcount::Int=1)
+function RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::Float64, translation_table::DataFrame, filterstates::String="", keep::String="", minp::Float64=0.00001, maxp::Float64=0.99999,  mincounts::Array=[1,20])
 
     if length(target_state_freq) < 1
         error("You must provide the baseline frequency of the target state observed in the whole dataset.\nThis is the population frequency over all samples.\n")
     end
 
-    if size(cpt, 1) < 2
-        error("\n\nRRcalculator iterates over two or more target queries.\nPlease add additional queries, or use bne(... relrisk=true) to estimate\nthe relative risk for a single target query.\n\n")
+    if length(unique(cpt.ConditionalVariables)) < 2
+        error("\n\nRRcalculator iterates over queries with multiple conditional variables.\nPlease run bne with more than one conditional variable first.\nFor a single conditional variable test, please use bne, relrisk=true,\nto estimate the absolute and relative risk ratios.\n\n")
     end
     
     df_cpt = copy(cpt)
 
     if in(target_state, names(cpt)) == false
-        error("\n\n$target_state not found. Target_state format is feature_state (e.g. Arrhythmia_true or Cancer_false)\n\n")
+        opt1 = string(names(cpt)[2])
+        opt2 = string(names(cpt)[3])
+        error("\n\n$target_state not found.\nPossible values are $opt1 and $opt2.\n\n")
     end
-    
+
+
     df_cpt = sort!( df_cpt[ (minp .≤ df_cpt[!,Symbol(target_state)] .≤ maxp) , :], Symbol(target_state), rev=true)
     opp_prob = Union{Float64,Missing}[]
 
@@ -96,6 +99,7 @@ function RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::F
     headdat = string.(split(replace(readline("BN.header"), "\"" => ""), " "))
     global dfc = CSV.read("BN.data", DataFrame, delim=" ", header=headdat)
 
+
     condcounts, tcounts = getcounts(df_cpt, dfc, target_state)
 
     insertcols!(df_cpt, 8, :ConditionalStateNames => vnames)
@@ -114,8 +118,14 @@ function RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::F
         df_cpt = df_cpt[ [i for i in occursin.( Regex("$keep") , df_cpt.ConditionalVariables) ] , :]
     end
 
-    df_cpt = df_cpt[df_cpt.CondCount .≥ mincondcount, :]
+    scs = size(df_cpt,1)
+    
+    df_cpt = df_cpt[df_cpt.CondCount .≥ mincounts[2], :]
+    df_cpt = df_cpt[df_cpt.Count     .≥ mincounts[1], :]
 
+    ecs = scs - size(df_cpt,1)
+    println("Omitting $ecs rows based on mincounts = $mincounts ...")
+    
     if names(df_cpt)[2] == target_state
         df_cpt = select(df_cpt, Not(3))
     else

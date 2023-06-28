@@ -1,7 +1,9 @@
 """
     cpt, tt, tf, adjM, mbM = bne("BN.data", "BN.header"; algo="sm", scoring_method="bic", f="", fs=0,  g=[], gs=[], verbose=false, DAG=false)
 
-    Construct a Bayesian network. Inputs are the formatted data and header files (see format()). Data must be binary, discrete or discretized continuous [1,2, ..., N]. Return 1) the conditional probabilities, 2) a dataframe of all input variables, mappings and state frequencies 3) target state frequencies and 4) the graph adjacency matrix.
+    Construct a Bayesian network. Create the input BN.data and BN.header files with format_file(). Data can be binary, discrete, or discretized for continuous data [1,2, ..., N]. Sample names are always in column1, and data should be type consistent, that is, all strings or all bool.
+
+Return values include  1) the conditional probabilities, 2) a dataframe of all input variables, mappings and state frequencies 3) target state frequencies and 4) the graph adjacency matrix.
 
     Network learning methods:
 
@@ -18,12 +20,12 @@
     
     Probability options with input example:
 
-        f            Feature/Target variable (required) "F1"
-        g            Given/Evidence features            ["F2", "F3"]
-        gs           Given/Evidence  states             ["2",   "1"]
-                     (Must be numeric string)
-        iterate      Iterate states                     [nodes|all]
-        relrisk      calc. rel risk ratio for target    [false]
+        f                Feature/Target variable (required)     "F1"
+        g                Given/Evidence features                ["F2", "F3"]
+        gs               Given/Evidence  states                 ["2",   "1"]
+                         (Must be numeric string)
+        iterate          Iterate states                         [nodes|all]
+        relrisk          calc. rel risk ratio for target        [false]
 
                      
     Bootstrapping options
@@ -35,42 +37,49 @@
 
     Plot options
 
-        DAG    plot is directed acyclic graph    [false]
-        plot   network or markov blanket "mb"    ["net"]
+        DAG                 plot is directed acyclic graph      [false]
+        plot                network or markov blanket "mb"      ["net"]
+        plotmethod          network plot style                  [:stress]
 
     Other options:
 
-        minfreq      min variable state frequency cutoff [0.00]
-        verbose      verbose output                      [false]
-        confmeth     CI95 calculation method             normal|empirical
+        minfreq             min variable state frequency cutoff [0.00]
+        verbose             verbose output                      [false]
+        confmeth            CI95 calculation method             normal|empirical
+        rrrdenom            specify rel risk ratio denominator  []
 
     Examples:
 
-    1. Simple query for a target and two evidence features and their states:
-    bne("BN.data", "BN.header", algo="sm", scoring_method="BIC", f="A", g=["B", "C", ], gs=["2","1"] )
+    1. Simple query for a target and two evidence features and the feature states:
+    bne("BN.data", "BN.header", algo="sm", scoring_method="BIC", f="A", g=["B", "C" ], gs=["2","1"] )
 
-    2. Query feature for 3 specified nodes. All states for all nodes examined.
+    2. Query feature for 3 specified nodes. Examine all states for all nodes.
     cpt, c_df, f, adjM, mbM = bne("BN.data", "BN.header", algo="hc", scoring_method="AIC", f="A", g=["B", "C", "D" ], iterate="nodes" )
 
-    3. Query feature for all nodes. All states for all nodes examined.
-    cpt, c_df, f, adjM, mbM = bne("BN.data", "BN.header", algo="sm", scoring_method="BDeu", f="A", iterate="all" )
+    3. Query a feature for all nodes in the network.
+    cpt, c_df, f, adjM, mbM = bne("BN.data", "BN.header", algo="hc", scoring_method="BDeu", f="A", iterate="all" )
 
 
 """
-function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, g::Array=[], gs::Array=[], bootstrap=0, impute::Bool=false, iterate::String="", minfreq::Float64=0.00, verbose::Bool=false, relrisk::Bool=false, rr_bootstrap::Int=100, bootstrap_method::String="resample", bootout="",  DAG::Bool=false, plot::String="net", boot_plot::Bool=false, nolimit::Bool=false, confmeth::String="normal", plotmethod::Symbol=:stress)
+function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, g::Array=[], gs::Array=[], bootstrap=0, impute::Bool=false, iterate::String="", minfreq::Float64=0.00, verbose::Bool=false, relrisk::Bool=false, rr_bootstrap::Int=100, bootstrap_method::String="resample", bootout="",  DAG::Bool=false, plot::String="net", boot_plot::Bool=false, nolimit::Bool=false, confmeth::String="normal", plotmethod::Symbol=:stress, rrrdenom::Array=[])
 
+    
     if sum(occursin.(r" ", gs)) > 0
         error("\nSpaces are not allowed in the gs states: gs = $gs\n\n")
     end
 
+    if length(g) != length(gs)
+        error("\nPlease provide one state for each conditional variable.\ng:  $g\ngs: $gs\n")
+    end
+    
     if length(iterate) > 0
         
-        if !occursin(r"(all)|(nodes)", iterate)
-            error("\n\niterate must be \"nodes\" or \"all\" not $iterate\n\n")
+        if !occursin(r"(^all$)|(^nodes$)", iterate)
+            error("\n\nIterate options are \"nodes\" or \"all\". Input was $iterate\n\n")
         end
         
         if relrisk == true
-        error("\n\nUse the relrisk option to obtain final risk estimates with confidence intervals for a single target-feature(s) combination. See feature_selector() and RRcalculator() for multi-feature risk calculations and more options.\n\n")
+        error("\n\nIterate option is not compatible with relrisk.\n\n")
         end
 
     end
@@ -197,6 +206,10 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
 
     mbM, mbnames = get_markov_blanket(adjM, dagnames, f)
 
+    if plot == "mb" && sum(mbM) < 2
+        error("\nMarkov blanket for $f not found.\nTry using more variables or setting plot=net.\n")
+    end
+    
     if plot == "mb"
         mb_plt = plot_network(mbM, headerfile="BN.header", fnode=f, gnodes=g, DAG=DAG, method=plotmethod )
         println("Displaying Markov blanket plot of $f ...")
@@ -242,13 +255,17 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
     println("Calculating probabilities...")
     
     if iterate == "all"
-        
+
+        if length(rrrdenom) > 0
+            error("\n\nrrrdenom not yet implemented for iteration\n\n")
+        end
+
         if length(g) > 0 || length(gs) > 0
-            printstyled("INFO: Iterating all; ignoring user-specified condititional states.\n", color=:yellow)
+            printstyled("INFO: Iterating all nodes in the network.\nIgnoring user-specified condititional states.\n", color=:yellow)
         end
         
-        if length(vars) > 15
-            error("Final variable count > 15: Too many variables to iterate all of them!")
+        if length(vars) > 12
+            error("Final variable count is >12.\nConsider only the key variables to iterate over\nto complete in reasonable time!")
         end
         
         if length(f) == 0
@@ -268,13 +285,17 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
                 continue
             end
 
-            probout, jpout = ConProb(; f=f, g=g, gs=gs, vars=vars, verbose=verbose, rr_bootstrap=0)
+            probout, jpout = ConProb(; f=f, fs=fs, g=g, gs=gs, vars=vars, verbose=verbose, rr_bootstrap=0)
             proball[mc] = jpout
             mc += 1
         end
 
     elseif iterate == "nodes"
 
+        if length(rrrdenom) > 0
+            error("\n\nrrrdenom not yet implemented for iteration\n\n")
+        end
+        
         println("Calculating all probabilities selected nodes: $g")
         
         df_j = df_j[findall(in(g), df_j.feature), :] 
@@ -296,7 +317,7 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
                 continue
             end
             
-            probout, jpout = ConProb(; f=f, g=g, gs=gs, vars=vars, verbose=verbose, rr_bootstrap = 0)    
+            probout, jpout = ConProb(; f=f, fs=fs, g=g, gs=gs, vars=vars, verbose=verbose, rr_bootstrap = 0)    
             proball[mc] = jpout
             mc += 1
  
@@ -307,11 +328,17 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
         println("$('-'^75)")
         printstyled("Performing single probability query ...\nListing conditional probabilities for all states of $f ...\n", color=:green)
 
-        probout, jpout = ConProb(; f=f, g=g, gs=gs, vars=vars, verbose=true, rr_bootstrap=0)
+        if length(rrrdenom) > 0
+            println("Using user specified relative risk ratio denominator: $rrrdenom...")
+            gso = rrrdenom
+        else
+            gso = replace(gs, "1" => "2", "2" => "1")
+        end
+        
+        probout, jpout = ConProb(; f=f, fs=fs, g=g, gs=gs, vars=vars, verbose=true, rr_bootstrap=0)
         #println("===>", probout, "  ", jpout)
 
-        gso = replace(gs, "1" => "2", "2" => "1")
-        probout_o, jpout  = ConProb(; f=f, g=g, gs=gso, vars=vars, verbose=false, rr_bootstrap=0);        
+        probout_o, jpout = ConProb(; f=f, fs=fs, g=g, gs=gso, vars=vars, verbose=false, rr_bootstrap=0);        
         
         if relrisk == true
 
@@ -329,13 +356,14 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
             fsi = parse(Int,fs)
             rrr = probout[fsi]       #rr target prob
             rro = probout_o[fsi]     #rr opp prob
+            
             RR = round(rrr / rro, digits=4)
             
             tpf = dftf[fsi]          #target (baseline) pop freq
 
             absrisk = round(rrr/tpf, digits=4)
 
-            CI95, PRdist, RRest = bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=scoring_method, f=f, fs=fs, g=g, gs=gs, bootstrap=0, iterate="", minfreq=0.00, verbose=false, rr_bootstrap=rr_bootstrap, bootstrap_method=bootstrap_method, boot_plot=boot_plot, confmeth=confmeth)
+            CI95, PRdist, RRest = bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=scoring_method, f=f, fs=fs, g=g, gs=gs, bootstrap=0, iterate="", minfreq=0.00, verbose=false, rr_bootstrap=rr_bootstrap, bootstrap_method=bootstrap_method, boot_plot=boot_plot, confmeth=confmeth, rrrdenom=rrrdenom)
 
              
             
@@ -350,7 +378,7 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
                 if ARlower < 0
                     ARlower = 0.0
                 end
-#       println(ARlower, "    ", ARupper)                                
+
                 elseif (confmeth == "empirical")
 
                 ARest   = round(median(ARdist), digits=4)            
@@ -368,20 +396,23 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
 
             println()
             println("$('-'^75)")
-            println("Relative Risk Estimates:\n")
-            println("    P($fcond|$pconds); P = $rrr")
-            println("       vs.")
-            println("    P($fcond|$oconds); P = $rro\n")
-            printstyled("    Network propagated Relative Risk Ratio: $RR\n", color=:cyan)
-            printstyled("    Bootstrap Relative Risk Distribution:   $RRest  CI95 $CI95\n\n", color=:cyan)
+            println()
 
             println("Absolute Risk Estimates:\n")
-            println("    P($fcond|$pconds);")
+            println("    P($fcond|$pconds)")
             println("       vs.")
-            println("    P($fcond) = $tpf; (baseline)\n")
+            println("    P($fcond) = $tpf  (baseline)\n")
             printstyled("    Network propagated Absolute Risk Ratio: $absrisk\n", color=:cyan)
             printstyled("    Bootstrap Absolute Risk Distribution:   $ARest  CI95 ($ARlower, $ARupper)\n", color=:cyan)
 
+            println()
+            println("Relative Risk Estimates:\n")
+            println("    P($fcond|$pconds) = $rrr")
+            println("       vs.")
+            println("    P($fcond|$oconds) = $rro\n")
+            printstyled("    Network propagated Relative Risk Ratio: $RR\n", color=:cyan)
+            printstyled("    Bootstrap Relative Risk Distribution:   $RRest  CI95 $CI95\n\n", color=:cyan)
+            
 #            if (absrisk < ARlower) || (absrisk > ARupper) || (RR < CI95[1]) || (RR > CI95[2])
 #                printstyled("\nINFO:\nRisk estimate(s) from input data fall outside the resampled distribution.\n", color=:grey)
 #                printstyled("This often means there are few, if any, samples for the requested query\nor that too few bootstraps were performed.\n", color=:yellow)
@@ -403,6 +434,7 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
                 OUT = open(bootout, "a")
                 println(OUT, "$tvl\t$cvl\t$tpf\t$rrr\t$absrisk\t$ARest\t$ARlower\t$ARupper\t$RR\t$RRest\t$RRlower\t$RRupper")
                 close(OUT)
+
             end
             
         end

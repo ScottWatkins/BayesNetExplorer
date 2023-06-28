@@ -30,6 +30,7 @@
         edgelabel     matrix for edge labels      []
         edgewidth     matrix of edge widths       [2.0 ...; ... 2.0]               
         boxcolor      color for edge label box    :white
+        moral_line    width of add moral lines    1.0
 
 Notes:
 1. Edgelabel is a string matrix that matches the dag adjM.
@@ -43,7 +44,7 @@ Notes:
 3. If the matrix is symmetrical, the graph is non-directional.      
 
 """
-function plot_network(adjM::Matrix; headerfile::String="", fnode::String="", gnodes::Array=[], bnodes::Array=[], cnodes::Array=[],  DAG::Bool=true,  nodeshape::Symbol=:rect, method::Symbol=:stress, trimnames::Int=10, fontsize::Number=5, nodesize::Float64=0.1, curves::Bool=false, dims::Int64=2, ncolors::Array=[:orange, :skyblue1, :lightgoldenrod1, :palegreen3, :grey80], moralize::Bool=false, nodenames::Array=[], curvescale::Float64=0.03, edgelabel::Array=[], edgewidth::Array=[], node_weights::Vector=[], boxcolor::Symbol=:white, linewidth::Float64=1.0)
+function plot_network(adjM::Matrix; headerfile::String="", fnode::String="", gnodes::Array=[], bnodes::Array=[], cnodes::Array=[],  DAG::Bool=true,  nodeshape::Symbol=:circle, method::Symbol=:stress, trimnames::Int=10, fontsize::Number=5, nodesize::Float64=0.06, curves::Bool=false, dims::Int64=2, ncolors::Array=[:orange, :skyblue1, :lightgoldenrod1, :palegreen3, :grey80], moralize::Bool=false, nodenames::Array=[], curvescale::Float64=0.03, edgelabel::Array=[], edgewidth::Array=[], node_weights::Vector=[], boxcolor::Symbol=:white, linewidth::Float64=1.0, moral_line::Float64=1.0 )
     
 
     if isfile(headerfile)
@@ -57,6 +58,11 @@ function plot_network(adjM::Matrix; headerfile::String="", fnode::String="", gno
         println(nodenames)
     end
 
+    if DAG == true && moralize == true
+        error("\nMoralization converts a directed network to a non-directed network,\nso DAG should be set to false.\n")
+    end
+
+    
     if length(gnodes) > 0 || length(fnode) > 0
         
         c = []
@@ -170,8 +176,8 @@ function plot_network(adjM::Matrix; headerfile::String="", fnode::String="", gno
     else
 
         if moralize == true
-
-            adjM_moral, edgM = moralizeDAG(adjM)  #func to marry parents        
+            
+            adjM_moral, edgM = moralizeDAG(adjM, moral_line=moral_line)  #marry parents        
             printstyled("Creating non-directional, moralized network...\n", color=:green)
             M = make_sym(adjM_moral)       #func to make symmetrical
 

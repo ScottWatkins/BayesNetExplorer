@@ -4,7 +4,7 @@
 
 
 """
-function moralizeDAG(adjM)
+function moralizeDAG(adjM; moral_line::Float64=1.0)
 
     Q = deepcopy(adjM)
 
@@ -34,8 +34,8 @@ function moralizeDAG(adjM)
         if Q[i[1],i[2]] == 0 && Q[i[2],i[1]] == 0    
             Q[i[1],i[2]] = 1
             Q[i[2],i[1]] = 1
-            edgM[i[1],i[2]] = 0.2
-            edgM[i[2],i[1]] = 0.2
+            edgM[i[1],i[2]] = moral_line
+            edgM[i[2],i[1]] = moral_line
         end
     end
 
