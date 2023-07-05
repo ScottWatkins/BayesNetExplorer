@@ -51,5 +51,8 @@ include("moralizeDAG.jl")
 include("querywriter.jl")
 include("bnenbc.jl")
 include("bootstrapRRtable.jl")
+include("correlation_analyzer.jl")
+include("pairwise_correlations.jl")
+include("StatsFunctions.jl")
 
 end

@@ -64,13 +64,6 @@ Return values include  1) the conditional probabilities, 2) a dataframe of all i
 function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, g::Array=[], gs::Array=[], bootstrap=0, impute::Bool=false, iterate::String="", minfreq::Float64=0.00, verbose::Bool=false, relrisk::Bool=false, rr_bootstrap::Int=100, bootstrap_method::String="resample", bootout="",  DAG::Bool=false, plot::String="net", boot_plot::Bool=false, nolimit::Bool=false, confmeth::String="normal", plotmethod::Symbol=:stress, rrrdenom::Array=[])
 
     
-    if sum(occursin.(r" ", gs)) > 0
-        error("\nSpaces are not allowed in the gs states: gs = $gs\n\n")
-    end
-
-    if length(g) != length(gs)
-        error("\nPlease provide one state for each conditional variable.\ng:  $g\ngs: $gs\n")
-    end
     
     if length(iterate) > 0
         
@@ -130,15 +123,28 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
     dfcleaned, df_freq = clean_dfvars_by_frequency("$data", minfreq; nolabels=true, delim=" ", header=headdat)
 
     #check input and features
-    println("Checking conditional variables and states...")
-    for i in eachindex(g)
-        if in(parse(Int64, gs[i]), dfcleaned[:, Symbol(g[i])])
-            println("Conditional variable: ", g[i], " state: ", gs[i], " ... OK.")
-        else
-            error("\n\nConditional variable: ", g[i], " state: ", gs[i], " ... not found. Check input.\n\n")
+    if length(iterate) > 0
+        
+    else
+        println("Checking conditional variables and states...")
+
+        if sum(occursin.(r" ", gs)) > 0
+            error("\nSpaces are not allowed in the gs states: gs = $gs\n\n")
+        end
+        
+        if length(g) != length(gs)
+            error("\nPlease provide one state for each conditional variable.\ng:  $g\ngs: $gs\n")
+        end
+
+        for i in eachindex(g)
+            if in(parse(Int64, gs[i]), dfcleaned[:, Symbol(g[i])])
+                println("Conditional variable: ", g[i], " state: ", gs[i], " ... OK.")
+            else
+                error("\n\nConditional variable: ", g[i], " state: ", gs[i], " ... not found. Check input.\n\n")
+            end
         end
     end
-    
+        
     print("Processing network data...\n")
     
     R"dataset <- BNDataset( $data, $header, starts.from = 1)"  #must use 1-based variables
@@ -156,6 +162,7 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
     end
 
     # use @suppress to suppress screen output by R 
+
     if impute == true && bootstrap > 0
         println("Using imputed data and network bootstrapping $bootstrap times...")
         @suppress R"dataset <- bootstrap(dataset, num.boots = $bootstrap, imputation = $impute)"

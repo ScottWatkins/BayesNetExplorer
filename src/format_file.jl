@@ -35,8 +35,10 @@ function format_file(infile::Union{String,DataFrame}; datacols::Array=[], delim:
             error("\n\nCould not find infile: $infile\n\n")
         end
     end
-        
-    df, rmap = recoder(infile, recode_bool=recode_bool, recode12=recode12, delim=delim)
+
+println(typeof(recode_bool))
+    
+    df, rmap = recoder(infile; recode_bool=recode_bool, recode12=recode12, delim=delim)
 
     ids = df[:,1]
     dfc = size(df,2)

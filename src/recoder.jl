@@ -10,15 +10,20 @@ Options:
 """
 function recoder(d::Union{String,DataFrame}; recode12=false, recode_bool=false, delim=delim)
 
+    println("===>", recode_bool)
+
     if typeof(d) == String && isfile(d) == true
         println("Reading data from file: $d")
-        d = CSV.read(d, DataFrame, delim=delim, types=String)
+
+        if recode_bool == true || recode12 == true
+            d = CSV.read(d, DataFrame, delim=delim)
+        else
+            d = CSV.read(d, DataFrame, delim=delim, types=String)
+        end
     end
-    
     col1name = Symbol(names(d)[1])
 
     if recode_bool == true
-
         db = Bool.(d[!, 2:end])
         d = hcat(d[:,1], db)
         rename!(d, :x1 => col1name)
