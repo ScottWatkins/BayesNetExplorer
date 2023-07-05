@@ -1,7 +1,7 @@
 name = "BayesNetExplorer"
-uuid = "d2014824-cbb4-407f-a93a-fdf131677a3f"
-authors = ["Scott Watkins  <scott.watkins@genetics.utah.edu>"]
-version = "0.3.0"
+uuid = "a92ebd65-ae51-424d-a849-a44db18093ea"
+authors = ["ScottWatkins <scott.watkins@genetics.utah.edu>"]
+version = "0.3.1"
 
 [deps]
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
@@ -22,12 +22,3 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 Suppressor = "fd094767-a336-5f1f-9728-57cf17d0bbfb"
-
-[compat]
-julia = "1.8"
-
-[extras]
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-
-[targets]
-test = ["Test"]
