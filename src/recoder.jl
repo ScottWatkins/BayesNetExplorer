@@ -10,8 +10,6 @@ Options:
 """
 function recoder(d::Union{String,DataFrame}; recode12=false, recode_bool=false, delim=delim)
 
-    println("===>", recode_bool)
-
     if typeof(d) == String && isfile(d) == true
         println("Reading data from file: $d")
 
@@ -21,6 +19,7 @@ function recoder(d::Union{String,DataFrame}; recode12=false, recode_bool=false, 
             d = CSV.read(d, DataFrame, delim=delim, types=String)
         end
     end
+
     col1name = Symbol(names(d)[1])
 
     if recode_bool == true

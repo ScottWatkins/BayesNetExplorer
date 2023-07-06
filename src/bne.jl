@@ -1,9 +1,9 @@
 """
-    cpt, tt, tf, adjM, mbM = bne("BN.data", "BN.header"; algo="sm", scoring_method="bic", f="", fs=0,  g=[], gs=[], verbose=false, DAG=false)
+    cpt, tt, tf, adjM, adjMb, probout = bne("BN.data", "BN.header"; algo="sm", scoring_method="bic", f="", fs=0,  g=[], gs=[])
 
     Construct a Bayesian network. Create the input BN.data and BN.header files with format_file(). Data can be binary, discrete, or discretized for continuous data [1,2, ..., N]. Sample names are always in column1, and data should be type consistent, that is, all strings or all bool.
 
-Return values include  1) the conditional probabilities, 2) a dataframe of all input variables, mappings and state frequencies 3) target state frequencies and 4) the graph adjacency matrix.
+Return values include  1) dataframe of conditional probabilities, 2) a dataframe of all variable frequencies, 3) target variable frequencies 4) adjacency matrix, 5) adjacency matrix for Markov blanket, and 6) a probabilities array. Additional options can be specified using keywords.
 
     Network learning methods:
 
@@ -21,11 +21,11 @@ Return values include  1) the conditional probabilities, 2) a dataframe of all i
     Probability options with input example:
 
         f                Feature/Target variable (required)     "F1"
-        g                Given/Evidence features                ["F2", "F3"]
+        g                Given/Evidence variables               ["F2", "F3"]
         gs               Given/Evidence  states                 ["2",   "1"]
                          (Must be numeric string)
         iterate          Iterate states                         [nodes|all]
-        relrisk          calc. rel risk ratio for target        [false]
+        relrisk          calc. rel risk ratio                   [false]
 
                      
     Bootstrapping options
@@ -37,33 +37,34 @@ Return values include  1) the conditional probabilities, 2) a dataframe of all i
 
     Plot options
 
-        DAG                 plot is directed acyclic graph      [false]
+        DAG                 plot is a directed acyclic graph    [false]
         plot                network or markov blanket "mb"      ["net"]
         plotmethod          network plot style                  [:stress]
 
     Other options:
 
-        minfreq             min variable state frequency cutoff [0.00]
+        minfreq             min variable state frequency cutoff [0.0]
         verbose             verbose output                      [false]
-        confmeth            CI95 calculation method             normal|empirical
-        rrrdenom            specify rel risk ratio denominator  []
-
+        confmeth            CI95 calculation method             [t-dist|normal]
+        rrrdenom            specify target states for the       []
+                            relative risk ratio denominator.
+                            Default: all query states negated.
     Examples:
 
-    1. Simple query for a target and two evidence features and the feature states:
+    First, use format_file() to create the input files for the network. For exact networks, use 5 to 15 non-collinear conditionally dependent variables with minimum frequencies of five percent (recommended). For larger networks, use non-exact algorithms and set nolimit=true.
+
+    1. A simple query for a feature and two given evidence variables and states:
     bne("BN.data", "BN.header", algo="sm", scoring_method="BIC", f="A", g=["B", "C" ], gs=["2","1"] )
 
-    2. Query feature for 3 specified nodes. Examine all states for all nodes.
-    cpt, c_df, f, adjM, mbM = bne("BN.data", "BN.header", algo="hc", scoring_method="AIC", f="A", g=["B", "C", "D" ], iterate="nodes" )
+    2. Query feature for 3 specified evidence variables. Examine all states for all evidence nodes.
+    cpt, tf, f, adjM, adjMb, probout = bne("BN.data", "BN.header", algo="hc", scoring_method="AIC", f="A", g=["B", "C", "D" ], iterate="nodes" )
 
-    3. Query a feature for all nodes in the network.
-    cpt, c_df, f, adjM, mbM = bne("BN.data", "BN.header", algo="hc", scoring_method="BDeu", f="A", iterate="all" )
+    3. Query a feature for variables (nodes) in all states in the network.
+    cpt, tf, f, adjM, adjMb, probout = bne("BN.data", "BN.header", algo="hc", scoring_method="BDeu", f="A", iterate="all" )
 
 
 """
 function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, g::Array=[], gs::Array=[], bootstrap=0, impute::Bool=false, iterate::String="", minfreq::Float64=0.00, verbose::Bool=false, relrisk::Bool=false, rr_bootstrap::Int=100, bootstrap_method::String="resample", bootout="",  DAG::Bool=false, plot::String="net", boot_plot::Bool=false, nolimit::Bool=false, confmeth::String="normal", plotmethod::Symbol=:stress, rrrdenom::Array=[])
-
-    
     
     if length(iterate) > 0
         
@@ -82,6 +83,8 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
     else
         error("\n\nERROR: $algo is not an implemented algorithm.\n\n")
     end
+
+    line = "-"^75   
     
     @suppress R"library(bnstruct)"
     @suppress R"library(qgraph)"
@@ -96,13 +99,13 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
     if length(bootout) > 0 && !isfile("bootheader.txt")   #header for bootstrap file
         OUT = open("bootheader.txt", "w")
         println(OUT, "## Network nodes: $headdat ")
-        println(OUT, "Target\tConditionals\tP(T)\tP(T|C)\tARR\tARRest\tARRlower\tARRupper\tRRR\tRRRest\tRRRlower\tRRRupper")
+        println(OUT, "Target\tConditionals\tCondDenom\tP(T)\tP(T|C)\tARR\tARRest\tARRlower\tARRupper\tRRR\tRRRest\tRRRlower\tRRRupper")
         close(OUT)
     end
     
-    limit = 17
+    limit = 16
     if nolimit == true
-        limit = 1000
+        limit = 10000
     else
         if length(headdat) > limit
             error("\n\nBNE: Input with >16 variables will have very long compute times.\nSelect up to 16 variables for exact network analysis.\nFor example, format_file(\"filename.csv\", datacols=[1,2,5,6,7]).\n\nLarge approximate networks can be made with using\ngreedy algorithms (e.g., algo=\"hc\") and setting nolimit=true.\nGreedy networks may differ from the more accurate exact networks.\n\n")
@@ -332,11 +335,11 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
 
     else
 
-        println("$('-'^75)")
+        println(line)
         printstyled("Performing single probability query ...\nListing conditional probabilities for all states of $f ...\n", color=:green)
 
         if length(rrrdenom) > 0
-            println("Using user specified relative risk ratio denominator: $rrrdenom...")
+            println("Using user specified relative risk ratio denominator: $rrrdenom")
             gso = rrrdenom
         else
             gso = replace(gs, "1" => "2", "2" => "1")
@@ -350,7 +353,7 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
         if relrisk == true
 
             printstyled("Calculating relative and absolute risks with CI95 ($rr_bootstrap bootstraps) ...\n", color=:green)
-            println("$('-'^75)")
+            println(line)
             
             if fs == 0 || typeof(fs) == Int
                 error("\n\nPlease set the target state to bootstrap in string format (e.g. fs=\"2\").\n")
@@ -402,7 +405,7 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
             oconds = join(g .* "=" .* gso, ", ")
 
             println()
-            println("$('-'^75)")
+            println(line)
             println()
 
             println("Absolute Risk Estimates:\n")
@@ -425,7 +428,7 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
 #                printstyled("This often means there are few, if any, samples for the requested query\nor that too few bootstraps were performed.\n", color=:yellow)
 #            end
             
-            println("$('-'^75)")
+            println(line)
 
             if length(bootout) > 0
                 tvl = f * "=" * fs
@@ -435,11 +438,12 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
                 end
 
                 cvl = cvl[1:end-1]
+                gso_p = join([g[i] * "=" * gso[i] for i in eachindex(g)], ",") # printable denom states
 
                 RRlower = CI95[1]
                 RRupper = CI95[2]
                 OUT = open(bootout, "a")
-                println(OUT, "$tvl\t$cvl\t$tpf\t$rrr\t$absrisk\t$ARest\t$ARlower\t$ARupper\t$RR\t$RRest\t$RRlower\t$RRupper")
+                println(OUT, "$tvl\t$cvl\t$gso_p\t$tpf\t$rrr\t$absrisk\t$ARest\t$ARlower\t$ARupper\t$RR\t$RRest\t$RRlower\t$RRupper")
                 close(OUT)
 
             end

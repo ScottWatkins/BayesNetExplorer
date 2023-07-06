@@ -36,8 +36,6 @@ function format_file(infile::Union{String,DataFrame}; datacols::Array=[], delim:
         end
     end
 
-println(typeof(recode_bool))
-    
     df, rmap = recoder(infile; recode_bool=recode_bool, recode12=recode12, delim=delim)
 
     ids = df[:,1]

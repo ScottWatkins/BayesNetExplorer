@@ -9,10 +9,13 @@ function querywriter(rrtable::DataFrame)
     qa = []
 
     for i in eachrow(rrtable)
-           cv = split(i[9], ",")
-           cs = split(i[11], ",")
-           condvars=""
+        cv = split(i[9], ",")
+        cs = split(i[11], ",")
+        condvars=""
 
+        println(cv)
+        println(cs)
+        
         for j in 1:length(cv)
             condvars = condvars * cv[j] * "=" * cs[j] * ","
         end
