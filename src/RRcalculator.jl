@@ -1,28 +1,31 @@
 """
     RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::Float64, translation_table::DataFrame=tt, mincondcount::Int=20, minp::Float=0.0, maxp::Float=1.0)
 
-Calculate the relative and absolute risk ratios from a conditional probability table generated with the bne function. Process and sort all targets and target conditions. Users may apply filters to help remove low confidence conditional probabilities. All conditional variables in the input table must have exactly two states (e.g. 0/1 or true/false). The target variable can be multistate.
+Calculate the relative and absolute risk ratios from a conditional probability table generated with the bne function. Process and sort all targets and target conditions. Users may apply filters to help remove low confidence conditional probability queries.
 
-All required inputs are generated from the bne() function. These include the main conditional probability table, the target state, the observed frequency of the target state, and the variable translation table. 
+All conditional variables in the input table must have exactly two states (e.g. 0/1 or true/false). The target variable can be multistate. All required inputs are generated from the bne() function. These include the main conditional probability table, the target state, the observed frequency of the target state, and the variable translation table. 
 
 Notes:
-1) mincondcount is set to 20 by default and may need to be set to a lower value if the data set is small or the target variable state has a low frequency (see discussion section in the manual).
+1) mincounts is set to [1,20] by default but may need to be set lower if the data set is small or the target variable state has a low frequency (see discussion section in the manual).
 2) Combinations of  mutually exclusive (e.g., hot one encoded) combinations produce that produce zero counts will be omitted from the output.
 
     Options:
 
-        minp            minimum probability to report         [0.00001]
-        maxp            maximum probability to report         [0.99999]
-        filterstates    remove conditional variables          ""
-        keep            keep conditional variable             ""
+        minp            minimum probability to report         [0.0001]
+        maxp            maximum probability to report         [0.9999]
+        filterstates    remove queries if conditional         ""
+                        variables contain this string
+        keep            keep queries if conditional           ""
+                        variable contain this string
         mincounts       min target and conditional counts     [1, 20]
+        scols           array of col indices to sort output   [9,5]
 
     Example:
 
         RRcalculator(cpt, target_state="Mortality_true", target_state_freq=0.01, translation_table=tt)
 
 """
-function RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::Float64, translation_table::DataFrame, filterstates::String="", keep::String="", minp::Float64=0.00001, maxp::Float64=0.99999,  mincounts::Array=[1,20])
+function RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::Float64, translation_table::DataFrame, filterstates::String="", keep::String="", minp::Float64=0.0001, maxp::Float64=0.9999,  mincounts::Array=[1,20], scols=[9,5] )
 
     if length(target_state_freq) < 1
         error("You must provide the baseline frequency of the target state observed in the whole dataset.\nThis is the population frequency over all samples.\n")
@@ -61,7 +64,7 @@ function RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::F
         
     end
 
-    insertcols!(df_cpt, 4, "P($target_state|!Y)" => opp_prob)
+    insertcols!(df_cpt, 4, "P($target_state|!X)" => opp_prob)
     rr = df_cpt[!, Symbol(target_state)] ./ opp_prob
     insertcols!(df_cpt, 5, :RelRiskRatio => rr)
 
@@ -108,7 +111,7 @@ function RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::F
     np_probs = tcounts ./ condcounts
     insertcols!(df_cpt, 7, :NonPropProb => np_probs)
     
-    sort!(df_cpt, [:RelRiskRatio, :CondCount], rev=true)
+    sort!(df_cpt, (scols .+ 1) , rev=false)
 
     if length(filterstates) > 0
         df_cpt = df_cpt[ [!i for i in occursin.( Regex("$filterstates") , df_cpt.ConditionalStateNames) ] , :]
@@ -132,7 +135,7 @@ function RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::F
         df_cpt = select(df_cpt, Not(2))
     end
 
-    nn = join(["P(", target_state, "|Y)"], "")
+    nn = join(["P(", target_state, "|X)"], "")
     rename!(df_cpt, Symbol(target_state) => nn)
     
     df_cpt[!,2:6] = round.(df_cpt[!, 2:6], digits=4)
