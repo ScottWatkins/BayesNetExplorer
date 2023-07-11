@@ -8,7 +8,8 @@ Options:
     recode12       Convert 0/1 dataframe to 1/2 dataframe
 
 """
-function recoder(d::Union{String,DataFrame}; recode12=false, recode_bool=false, delim=delim)
+function recoder(d::Union{String,DataFrame}; recode12::Bool=false, recode_bool::Bool=false, delim=delim)
+
 
     if typeof(d) == String && isfile(d) == true
         println("Reading data from file: $d")
@@ -23,6 +24,7 @@ function recoder(d::Union{String,DataFrame}; recode12=false, recode_bool=false, 
     col1name = Symbol(names(d)[1])
 
     if recode_bool == true
+
         db = Bool.(d[!, 2:end])
         d = hcat(d[:,1], db)
         rename!(d, :x1 => col1name)
@@ -61,15 +63,21 @@ function recoder(d::Union{String,DataFrame}; recode12=false, recode_bool=false, 
     rmap = Dict()
     vcount = []
 
+    #convert special case of stringified bool matrix
+    if  unique(Matrix(d[:, 2:end])) == ["1", "0"] || unique(Matrix(d[:, 2:end])) == ["0", "1"]
+        d = hcat(d[:,1], replace.(d[:,2:end], "0" =>"No", "1"=>"Yes"))
+    end
+
+    
     for c in 2:size(d, 2)
         
         d[!,c] = string.(d[!,c]) #stringify all
-        
+
         u = sort(unique(d[!, c])) #false is 1, true is 2
         push!(vcount, length(u))
 
         k = 1
-        
+
         for i in 1:length(u)
             
             if recode12 == false && recode_bool == false
@@ -84,7 +92,7 @@ function recoder(d::Union{String,DataFrame}; recode12=false, recode_bool=false, 
         
     end
 
-    CSV.write("recoded.out", d, delim=",")
+#    CSV.write("recoded.out", d, delim=",")
     OUT = open("recoded.map", "w")
     println(OUT, "feature,state,numstate")
 
@@ -95,7 +103,7 @@ function recoder(d::Union{String,DataFrame}; recode12=false, recode_bool=false, 
 
     close(OUT)
 
-    println("Wrote recode data and recode map to recoded.out and recoded.map.")
+    println("Wrote recode map to recoded.map.")
 
     return d, rmap
 

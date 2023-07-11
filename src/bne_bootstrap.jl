@@ -104,7 +104,7 @@ function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=sco
     RRdiststd = std(RRdist)
 
     if confmeth == "normal"
-        RR_est = mean(RRdist)
+        RR_est = median(RRdist)
         lower, upper = confint(OneSampleTTest(RR_est, RRdiststd, rr_bootstrap), level=0.95)
         if lower < 0
             lower = 0.0

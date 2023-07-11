@@ -305,7 +305,11 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
         if length(rrrdenom) > 0
             error("\n\nrrrdenom not yet implemented for iteration\n\n")
         end
-        
+
+        if length(g) < 2
+            error("\n\nPlease specify at least 2 conditional variables to test.\n\n")
+        end
+
         println("Calculating all probabilities selected nodes: $g")
         
         df_j = df_j[findall(in(g), df_j.feature), :] 
@@ -488,7 +492,7 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
 
     dfp = sort(dfp, [2,3,4], rev=[true,true,true])
 
-    CSV.write("BN_cpts.table", dfp)
+    #CSV.write("BN_cpts.table", dfp)
 
     rm("BN.grain.cpts.out")
 

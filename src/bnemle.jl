@@ -231,6 +231,7 @@ function bnemle(data::Union{String,DataFrame}, query::String; digits::Int64=4, k
 
     rvals = runbnemle(df, newcols, z)
     
+
     function bnemlebootstrap(dfg, bootstraps, rvals) # Input must be original df
 
         if confmeth == "t-dist" || confmeth == "empirical"
@@ -244,8 +245,8 @@ function bnemle(data::Union{String,DataFrame}, query::String; digits::Int64=4, k
         
         if bootstraps > 0
             
-            if 1 < bootstraps < 499
-                error("\n\nUse at least 500 bootstraps for bootstrap estimates.\n\n")
+            if 1 < bootstraps < 99
+                error("\n\nUse at least 100 bootstraps for bootstrap estimates.\n\n")
             end
             
             B = Array{Float64, 2}(undef, bootstraps, 5)
@@ -285,7 +286,7 @@ function bnemle(data::Union{String,DataFrame}, query::String; digits::Int64=4, k
                 
                 return e, lc, uc                
             end
-            
+
             TF, TFlc, TFuc = myconfint(B1, bootstraps, digits)   #get estimates and CI95s
             ARR, ARRlc, ARRuc = myconfint(B2, bootstraps, digits)
             lp_ARR, lp_ARRlc, lp_ARRuc = myconfint(B3, bootstraps, digits)
@@ -320,10 +321,10 @@ function bnemle(data::Union{String,DataFrame}, query::String; digits::Int64=4, k
                     condcounts  = rvals[3][2]
                     targopp     = rvals[4][1]
                     oppall      = rvals[4][2]
-                    t_c_adj     = rvals[5][3]
-                    a_c_adj     = rvals[5][4]
-                    t_c_opp_adj = rvals[5][5]
-                    a_c_opp_adj = rvals[5][6]
+                    t_c_adj     = rvals[5][1]
+                    a_c_adj     = rvals[5][2]
+                    t_c_opp_adj = rvals[5][3]
+                    a_c_opp_adj = rvals[5][4]
 
                     sig = Vector{Int64}(undef, 4) #generate a different than 1 flag
                     svals_lc = parse.(Float64, [ARRlc, RRRlc, lp_ARRlc, lp_RRRlc])
@@ -376,10 +377,10 @@ function bnemle(data::Union{String,DataFrame}, query::String; digits::Int64=4, k
 
                     if length(outfile) > 0
                         OUT = open(outfile, "a")
-                        println(OUT, "$query\tAR\t$TF\t$TFlc\t$TFuc\t$all_c\t$targraw\t$mintf\t$mintfc\t$minsig\t$badflag")
-                        println(OUT, "$query\tARR\t$ARR\t$ARRlc\t$ARRuc\t$condcounts\t$targcounts\t$mintarg1\t$v1\t$s1\t$badflag")
+#                        println(OUT, "$query\tAR\t$TF\t$TFlc\t$TFuc\t$all_c\t$targraw\t$mintf\t$mintfc\t$minsig\t$badflag")
+#                        println(OUT, "$query\tARR\t$ARR\t$ARRlc\t$ARRuc\t$condcounts\t$targcounts\t$mintarg1\t$v1\t$s1\t$badflag")
                         println(OUT, "$query\tARR (adj)\t$lp_ARR\t$lp_ARRlc\t$lp_ARRuc\t$a_c_adj\t$t_c_adj\t$mintarg2\t$v2\t$s2\t$badflag")
-                        println(OUT, "$query\tRRR\t$RRR\t$RRRlc\t$RRRuc\t$oppall\t$targopp\t$mintarg3\t$v3\t$s3\t$badflag")
+#                        println(OUT, "$query\tRRR\t$RRR\t$RRRlc\t$RRRuc\t$oppall\t$targopp\t$mintarg3\t$v3\t$s3\t$badflag")
                         println(OUT, "$query\tRRR (adj)\t$lp_RRR\t$lp_RRRlc\t$lp_RRRuc\t$a_c_opp_adj\t$t_c_opp_adj\t$mintarg4\t$v4\t$s4\t$badflag")
                         close(OUT)
                     end

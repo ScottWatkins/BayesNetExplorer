@@ -1,6 +1,6 @@
 module BayesNetExplorer
 
-println("Welcome to BayesNetExplorer v0.3\n")
+println("Welcome to BayesNetExplorer v0.3.1\n")
 println("This package is under active development.\nFeedback and bug reports are appreciated!\n[scott.watkins@utah.edu]\n")
 println("Loading the package and all dependencies ...")
 
@@ -26,7 +26,7 @@ export bnemle
 export querywriter
 export bnenbc
 export bootstrapRRtable
-
+export bnescan
 
 include("impute_dataframe.jl")
 include("format_file.jl")
@@ -54,5 +54,6 @@ include("bootstrapRRtable.jl")
 include("correlation_analyzer.jl")
 include("pairwise_correlations.jl")
 include("StatsFunctions.jl")
+include("bnescan.jl")
 
 end

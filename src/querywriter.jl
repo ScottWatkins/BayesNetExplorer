@@ -1,7 +1,7 @@
 """
     querywriter(RRtable)
 
-Returns an array of probability queries from a RRtable for input into bnemle.
+Returns an array of probability queries from a RRtable.
  
 """
 function querywriter(rrtable::DataFrame)
