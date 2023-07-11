@@ -7,7 +7,8 @@ Calculate P(Y|X), the absolute risk ratio, and the relative risk ratio for a tar
             ts            target state to evaluate        "all"
             acs           cond. state for all tests       ""
             mincounts     min final, min cond. counts     [0,0]
-            outfile       write all results to file       "" bootstraps    number of bootstraps            100
+            outfile       write all results to file       ""
+            bootstraps    number of bootstraps            100
             confmeth      method to get CI95              "t-dist|empirical"
             minup         min pos effect to keep          1.0
             mindown       min neg effect to keep          1.0
