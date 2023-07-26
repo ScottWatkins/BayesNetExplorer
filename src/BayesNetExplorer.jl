@@ -27,6 +27,9 @@ export querywriter
 export bnenbc
 export bootstrapRRtable
 export bnescan
+export pairwise_correlations
+export correlation_analyzer
+export getRRtablerows
 
 include("impute_dataframe.jl")
 include("format_file.jl")
@@ -55,5 +58,7 @@ include("correlation_analyzer.jl")
 include("pairwise_correlations.jl")
 include("StatsFunctions.jl")
 include("bnescan.jl")
+include("getRRtablerows.jl")
 
 end
+

@@ -1,10 +1,10 @@
 """
      pairwise_correlations(df::DataFrame; method="Pearson")
 
-Calculate the pairwise correlations among variable in a dataframe.
+Calculate the pairwise correlations among variables in a dataframe.
 
-    Options
-        method   algorithm to use    Pearson|Spearman|Kendall
+    Options:
+        method   correlation method    Pearson|Spearman|Kendall
 
 """
 function pairwise_correlations(df::DataFrame; method="Pearson")

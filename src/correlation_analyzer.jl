@@ -62,8 +62,10 @@ function correlation_analyzer(df_r::DataFrame, num_samples::Int64; pmax::Float64
                     xrotation=45,
                     yticks=(1:size(MM,2), vnames),
                     title=title,
-                    c = cgrad(:heat),
-                    tickfontsize=10,
+                    clims=(-1.0, 1.0),
+#                    c = cgrad(:jet),
+                    c = cgrad(:balance),
+                    tickfontsize=9,
                     tickorientation=:out,
                     colorbar_title=cbtitle,
                     right_margin = 5Plots.mm,
@@ -74,9 +76,10 @@ function correlation_analyzer(df_r::DataFrame, num_samples::Int64; pmax::Float64
                   
                     )
 
-    glines = collect(1:1:(size(MM,1) - 1)) .+ 0.50
-    vline!(glines, label="", color=:grey50, alpha=0.5)
-    hline!(glines, label="", color=:grey50, alpha=0.5)
+    vglines = collect(1:1:(size(MM,1) - 1)) .+ 0.472
+    hglines = collect(1:1:(size(MM,1) - 1)) .+ 0.52
+    vline!(vglines, label="", color=:grey50, alpha=0.5)
+    hline!(hglines, label="", color=:grey50, alpha=0.5)
     # Note j and i are flipped to match flip_y above!!
     MM = merge_tril_triu(M_pvals, M)    #remake pval, correlation matrix
 

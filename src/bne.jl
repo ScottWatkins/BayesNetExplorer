@@ -45,7 +45,7 @@ Return values include  1) dataframe of conditional probabilities, 2) a dataframe
 
         minfreq             min variable state frequency cutoff [0.0]
         verbose             verbose output                      [false]
-        confmeth            CI95 calculation method             [t-dist|normal]
+        confmeth            CI95 calculation method             [t-dist|empirical]
         rrrdenom            specify target states for the       []
                             relative risk ratio denominator.
                             Default: all query states negated.
@@ -64,7 +64,7 @@ Return values include  1) dataframe of conditional probabilities, 2) a dataframe
 
 
 """
-function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, g::Array=[], gs::Array=[], bootstrap=0, impute::Bool=false, iterate::String="", minfreq::Float64=0.00, verbose::Bool=false, relrisk::Bool=false, rr_bootstrap::Int=100, bootstrap_method::String="resample", bootout="",  DAG::Bool=false, plot::String="net", boot_plot::Bool=false, nolimit::Bool=false, confmeth::String="normal", plotmethod::Symbol=:stress, rrrdenom::Array=[])
+function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, g::Array=[], gs::Array=[], bootstrap=0, impute::Bool=false, iterate::String="", minfreq::Float64=0.00, verbose::Bool=false, relrisk::Bool=false, rr_bootstrap::Int=100, bootstrap_method::String="resample", bootout="",  DAG::Bool=false, plot::String="net", boot_plot::Bool=false, nolimit::Bool=false, confmeth::String="empirical", plotmethod::Symbol=:stress, rrrdenom::Array=[])
     
     if length(iterate) > 0
         
@@ -383,7 +383,7 @@ function bne(data, header; algo="sm", scoring_method="BIC", f::String="", fs=0, 
             
             ARdist  = sort(PRdist ./ tpf)
 
-            if (confmeth == "normal")
+            if (confmeth == "t-dist")
 
                 ARest = round(median(ARdist), digits=4)
                 ARstd = std(ARdist)

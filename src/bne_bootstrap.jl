@@ -103,7 +103,7 @@ function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=sco
     RRdist = sort(RRdist)
     RRdiststd = std(RRdist)
 
-    if confmeth == "normal"
+    if confmeth == "t-dist"
         RR_est = median(RRdist)
         lower, upper = confint(OneSampleTTest(RR_est, RRdiststd, rr_bootstrap), level=0.95)
         if lower < 0

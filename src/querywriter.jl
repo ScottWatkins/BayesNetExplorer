@@ -13,8 +13,8 @@ function querywriter(rrtable::DataFrame)
         cs = split(i[11], ",")
         condvars=""
 
-        println(cv)
-        println(cs)
+#        println(cv)
+#        println(cs)
         
         for j in 1:length(cv)
             condvars = condvars * cv[j] * "=" * cs[j] * ","
