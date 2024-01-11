@@ -1,7 +1,7 @@
 """
     dfi = impute_dataframe(df; boolout=false)
 
-Imputes missing values in a dataframe. Input should be Float64 or Int.
+Imputes missing values in a dataframe. Input should be Float64 or Int64.
 Input must have fully labeled observations and variables!
 
 Options:
@@ -23,5 +23,7 @@ function impute_dataframe(df; boolout=false, k=10)
 
     CSV.write("BN.imputed.csv", dfmi, delim=",")          #save to disk
     println("Wrote BN.imputed.csv to disk.")
+
     return dfmi
+
 end

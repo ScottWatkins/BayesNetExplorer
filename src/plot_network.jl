@@ -1,14 +1,15 @@
 """
-    plot_network(adjM::Matrix; headerfile::String="", fnode::String="", gnodes::Array=[], DAG::Bool=true, nodeshape::Symbol=:circle )
+    plot_network(adjM; headerfile, fnode(s), gnodes, DAG=true, nodeshape=:circle )
 
     Plot a network using an adjacency matrix. Node names can be taken from the first line of a space delimited file (e.g., BN.header) as the. Required: adjacency matrix.
 
     Options
         headerfile    space delim file            "filename"
-        fnode         color target node           "nodename" 
+        fnode         color target node           "nodename" | [node1, node2] 
         gnodes        color nodes in array        ["node1", "node2"]
         bnodes        color nodes in array        ["node1", "node2"]
         cnodes        color node in array         ["node1", "node2"]
+        dnodes        color node in array         ["node1", "node2"] 
         method        graph layout                [:stress|:sfdp|:circular|
                                                   :shell|:spectral|:spring|
                                                   :tree|:buchheim|:arcdiagram|
@@ -18,11 +19,11 @@
         trimnames     max characters              20
         DAG           network is DAG              true
         moralize      join parents if DAG=false   false
-        ncolors       node colors [f,g,b,other]   [:orange, :blue, ...]
+        ncolors       node colors [f,g,b,c,d]     [:orange, :blue, ...]
         nodeweight    vec of relative node sizes  [1.0 ...]
         nodesize      node scalar                 [0.05]
         nodenames     optional node names         []
-                      (input must be string)
+                      (names must be strings)
         linewidth     size of lines               1.5
         curves        curve the arcs              false
         curvescale    amplitude of curve          0.03
@@ -30,10 +31,10 @@
         edgelabel     matrix for edge labels      []
         edgewidth     matrix of edge widths       [2.0 ...; ... 2.0]               
         boxcolor      color for edge label box    :white
-        moral_line    width of add moral lines    1.0
+        moral_line    width of add moral lines    1.5
 
 Notes:
-1. Edgelabel is a string matrix that matches the dag adjM.
+1. Edgelabel is a string matrix that matches the DAG adjM.
    1. "" indicates no edge label.
    2. If the adjM position has a 1, the edgelabel matrix
       can have a corresponding label. See (2) for input info.
@@ -44,9 +45,12 @@ Notes:
 3. If the matrix is symmetrical, the graph is non-directional.      
 
 """
-function plot_network(adjM::Matrix; headerfile::String="", fnode::String="", gnodes::Array=[], bnodes::Array=[], cnodes::Array=[],  DAG::Bool=true,  nodeshape::Symbol=:circle, method::Symbol=:stress, trimnames::Int=10, fontsize::Number=5, nodesize::Float64=0.06, curves::Bool=false, dims::Int64=2, ncolors::Array=[:orange, :skyblue1, :lightgoldenrod1, :palegreen3, :grey80], moralize::Bool=false, nodenames::Array=[], curvescale::Float64=0.03, edgelabel::Array=[], edgewidth::Array=[], node_weights::Vector=[], boxcolor::Symbol=:white, linewidth::Float64=1.0, moral_line::Float64=1.0 )
+function plot_network(adjM::Matrix; headerfile::String="", fnode::Union{String,Array}, gnodes::Array=[], bnodes::Array=[], cnodes::Array=[], dnodes::Array=[], DAG::Bool=true,  nodeshape::Symbol=:circle, method::Symbol=:stress, trimnames::Int=10, fontsize::Number=5, nodesize::Float64=0.06, curves::Bool=false, dims::Int64=2, ncolors::Array=[:orange, :skyblue1, :lightgoldenrod1, :palegreen3, :grey80], moralize::Bool=false, nodenames::Array=[], curvescale::Float64=0.03, edgelabel::Array=[], edgewidth::Array=[], node_weights::Vector=[], boxcolor::Symbol=:white, linewidth::Float64=1.0, moral_line::Float64=1.5 )
     
-
+    if typeof(fnode) == String
+        fnode = [fnode]
+    end
+    
     if isfile(headerfile)
         nodenames = split(replace(readline(headerfile), "\"" =>""), r"\s+")
     elseif length(nodenames) == size(adjM,2)
@@ -58,6 +62,10 @@ function plot_network(adjM::Matrix; headerfile::String="", fnode::String="", gno
         println(nodenames)
     end
 
+    if length(nodenames) < 7
+        nodesize::Float64=0.04
+    end
+    
     if DAG == true && moralize == true
         error("\nMoralization converts a directed network to a non-directed network,\nso DAG should be set to false.\n")
     end
@@ -68,10 +76,11 @@ function plot_network(adjM::Matrix; headerfile::String="", fnode::String="", gno
         c = []
         ncolors = ncolors
 
-        tn = findall(in([fnode]), nodenames)
+        tn = findall(in(fnode), nodenames)
         cn = findall(in(gnodes), nodenames)
         cn2 = findall(in(bnodes), nodenames)
         cn3 = findall(in(cnodes), nodenames)
+        cn4 = findall(in(dnodes), nodenames)
         
         if length(fnode) > 0 && length(tn) == 0
             error("\n\nInput fnode ($fnode) not found in network.\n\n")
@@ -88,6 +97,10 @@ function plot_network(adjM::Matrix; headerfile::String="", fnode::String="", gno
         if length(cnodes) > 0 && length(cn3) == 0
             error("\n\nInput cnodes name(s) not found in network.\n\n")
         end
+        
+        if length(dnodes) > 0 && length(cn4) == 0
+            error("\n\nInput dnodes name(s) not found in network.\n\n")
+        end
 
         for i in eachindex(nodenames)
             if in(i, tn)
@@ -98,6 +111,8 @@ function plot_network(adjM::Matrix; headerfile::String="", fnode::String="", gno
                 push!(c, ncolors[3])
             elseif in(i, cn3)
                 push!(c, ncolors[4])
+            elseif in(i, cn4)
+                push!(c, ncolors[5])
             else
                 push!(c, :snow2)
             end                        
@@ -210,7 +225,7 @@ function plot_network(adjM::Matrix; headerfile::String="", fnode::String="", gno
               linecolor=boxcolor,    #for edge label box 
               edgewidth=edgM,
               node_weights=node_weights,
-              arrow=:closed,
+              #arrow=:closed,        #adds extra line!
               method=method
               )
 

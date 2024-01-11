@@ -3,9 +3,9 @@
 
 A naive Bayes classifier that provides estimates of the posterior probability for an outcome (Y) given some body of evidence (X) that contains categorical variables, X = {x1, x2, ..., xn}. 
 
-Inputs: a dataframe with sample ids in column 1 and the probability query.
+Inputs: a dataframe with ids in column 1 and the probability query.
 
-If a second query is provided, the relative risk of the posterior probability of query1 vs. query2 is calculated. Class conditional probabilities with zero observations are Laplace corrected. Variables with >2 states are handled by a 2-state, one vs. the rest, approach.
+If a second query is provided, the relative risk of the posterior probability of query1 vs. query2 is calculated. Class conditional probabilities with zero observations are Laplace corrected. Variables with >2 states are handled by a 2-state, one vs. the rest approach.
 
     Keyword options:
         digits           Round to n digits                      [4]    
@@ -16,7 +16,7 @@ If a second query is provided, the relative risk of the posterior probability of
         q2               Custom rel. risk query                 "query"
                          [typically, P(Y|X1=No,X2=No...)]
 """
-function bnenbc(data::Union{String,DataFrame}, query::String; q2::String="", digits::Int64=6, k::Number=1, outfile::String="", bootstraps::Int64=0, mincounts::Array=[1,20], outfile2::String="" )
+function bnemap(data::Union{String,DataFrame}, query::String; q2::String="", digits::Int64=6, k::Number=1, outfile::String="", bootstraps::Int64=0, mincounts::Array=[1,20], outfile2::String="" )
 
  
     if typeof(data) == DataFrame
@@ -45,7 +45,7 @@ function bnenbc(data::Union{String,DataFrame}, query::String; q2::String="", dig
         t  = string(ta[1])
         ts = string(ta[2])       # t = target name, ts = target state
     
-        f = Dict()               # Dict of all conditional features and states
+        f = Dict()                 # Dict of all conditional features and input states
 
         for i in z[2]
             x =  split(i, "=")
@@ -59,8 +59,9 @@ function bnenbc(data::Union{String,DataFrame}, query::String; q2::String="", dig
     q1t, q1ts, q1f = getinput(query)    
 
     function getcounts(dfin::DataFrame, target::String, targetstate::String, features::Dict, k::Int64)
-        
+
         df = dfin; t = target; ts = targetstate; f=features; k=k;
+
         rc   = Dict()    # raw counts
         cf   = Dict()    # corrected freq
         rc_o = Dict()    # raw counts !Y
@@ -79,6 +80,15 @@ function bnenbc(data::Union{String,DataFrame}, query::String; q2::String="", dig
         println(line)
         println(rpad("Query", 45), rpad("Counts", 15),  "Frequency")
         println(line)
+        println("Marginal probabilities\n")
+
+        for i in keys(f)
+            println(i)
+        end
+        
+
+        println(line)
+
         println("Prior probabilities [P(Y)]\n")
         println(rpad("    $t=$ts", 45), rpad("$tc / $rows", 15), round(tf, digits=digits))
         println(rpad("    $t=!$ts", 45), rpad("$tc_o / $rows", 15), round(tf_o, digits=digits), "\n")

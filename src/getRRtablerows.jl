@@ -1,9 +1,7 @@
 """
     getRRtablerows(RRtable::DataFrame; targets::Array=[], condvars::Array=[], condstates::Array=[])
 
-Retrieve conditinal query results from a relative risk table (RRtable) created by iterate="all" or "nodes".
-
-this function simplies examining relative risk states when many variables are iterated using bne iteration.
+Retrieve conditional query results from a relative risk table (RRtable) created using iterate="all" or iterate="nodes" in bne. This function simplies finding and examining relative risk states when many variables are iterated using bne iteration.
 
 Example: getRRtablerows(dfa, targets=["MORT","EFF"], condvars=["MUTATION","VENT"], condstates=["Yes","Yes])
 
@@ -68,6 +66,10 @@ function getRRtablerows(RRtable::DataFrame; targets::Array=[], condvars::Array=[
 
         end
 
+        if length(condstates) > 4
+            error("\n\nThis function is currently limited to four conditional variables.\n\n")
+        end
+        
     end
 
     return dfz

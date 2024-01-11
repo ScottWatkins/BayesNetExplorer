@@ -1,31 +1,34 @@
 """
-    df, ids, features = format_file(userdata; datacols=[], delim=",", minfreq=0.0, recode_bool=false)
+    df, ids, features = format_file(datafile; datacols=[], delim=",", minfreq=0.0, recode_bool=false)
 
-Format input data and header files from a user provided data table. Write data and header files to disk (BN.data, BN.header). Write variable map file to disk (recode.map). The user input table *must* be text based unless it contains strictly boolean columns coded as 0/1 or true/false.
+Create and format variables to be used in the network from a user provided data table. Write data and header files to disk (BN.data, BN.header). Write variable map file to disk (recode.map). The user input table *must* be text based unless it contains strictly boolean variables coded as 0/1 or true/false.
 
-Input data must be a full matrix with observations in rows and features in columns. Observations and features must be fully labeled.  Features must be discrete or quantized variables. 
+The input data must be a full matrix with observations in rows and features in columns. Observations and features must be fully labeled.  Features must be discrete or quantized variables. 
 
-Input examples for text and boolean data sets: \\
 
-ID,SIZE,FLIGHT,HABITAT \\
+Options: 
+
+    datacols        columns to include         [:IDS, :VAR1, :VAR2]  
+    recode_bool     input is strictly boolean  [false]  
+    delim           set delimiter              [","]  
+    minfreq         min variable state freq    [0.0]
+
+Example text dataset: 
+
+ID,SIZE,FLIGHT,HABITAT\\
 X1,big,N,SAVANA \\
 X2,med,N,JUNGLE \\
 S4,sml,Y,FOREST \\
 D7,med,Y,RIPARIAN \\
 
 
+Example Boolean dataset:
+
 ID,V1,V2,V3 \\
-1,1,0,true \\
-4,0,0,false \\
-8,1,0,false \\
-9,1,1,true \\
-
-Options: \\
-
-datacols: specify columns in a vector array of symbols [:IDS, :VAR1, VAR2]  \\
-recode_bool: recode strictly 0/1 or true/false variables to 1/2 variables [false]  \\
-delim: set delimiter for data file input [","]  \\
-minfreq: the minimum frequency for any variable state [0.0]  \\
+ID1,1,0,true \\
+ID4,0,0,false \\
+ID8,1,0,false \\
+ID9,1,1,true \\
 
 """
 function format_file(infile::Union{String,DataFrame}; datacols::Array=[], delim::Union{String,Char}=",", minfreq::Float64=0.0, recode_bool::Bool=false, recode12::Bool=false, datafile="BN.data", headerfile="BN.header")
