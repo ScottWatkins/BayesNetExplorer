@@ -7,9 +7,9 @@
 
     Note that for each iteration, individuals are randomly resampled, and a new network is remade. Therfore, speed decreases very rapidly as the number of nodes increases.  
 """
-function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=scoring_method, f=f, fs=fs, g=g, gs=gs, bootstrap=0, iterate="", minfreq=0.00, verbose=false, rr_bootstrap=rr_bootstrap, bootstrap_method=boostrap_method, boot_plot=boot_plot, confmeth=confmeth, rrrdenom=rrrdenom)
+function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=scoring_method, f=f, fs=fs, g=g, gs=gs, bootstrap=0, iterate="", minfreq=0.00, verbose=false, rr_bootstrap=rr_bootstrap, bootstrap_method=boostrap_method, boot_plot=boot_plot, confmeth=confmeth, rrrdenom=rrrdenom, type=type, query=query)
 
-    if 1 < rr_bootstrap < 100
+    if 1 < rr_bootstrap < 10
         printstyled("INFO::For better accuracy, use at least 100 rr_bootstrap replicates.\n", color=:yellow)
     end
     
@@ -29,7 +29,7 @@ function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=sco
 
     RRdist = Float64[]   
     PRdist = Float64[]
-    fs = parse(Int, fs)
+    fs = parse.(Int, fs)
 
     print("Bootstrapping: ")        
 
@@ -45,7 +45,7 @@ function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=sco
 
         # Randomly resample all rows and write to file
         if bootstrap_method == "resample"
-           bd = bd[rand(1:nrow(bd), size(bd,1)), :]           
+            bd = bd[rand(1:nrow(bd), size(bd,1)), :]           
         elseif bootstrap_method == "jackknife"
             nof = Int(floor((size(bd,1)/2)))
             bd = bd[rand(nof, size(bd,1)), :]
@@ -55,11 +55,11 @@ function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=sco
 
         bd_z = "bd_$z"
         writedlm("bd_$z", bd, " ") #resampled data
-
+        
         @suppress R"dataset <- BNDataset( $bd_z, $header, starts.from = 1)";   #1-based variables only
         vars = rcopy(R"vars <- variables(dataset)")
         @suppress R"df = read.csv(file = $data, sep = ' '); colnames(df) <- vars" 
-
+        
         @suppress R"vars <- variables(dataset)";
         @suppress R"net <- learn.network(dataset, algo = $algo, scoring.func = $scoring_method)";
         @suppress net = rcopy(R"net <- learn.network(dataset, algo = $algo, scoring.func = $scoring_method)";)
@@ -67,9 +67,8 @@ function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=sco
 
         @suppress R"dadjm <- net@dag";         
         @suppress R"rownames(dadjm) <- vars; colnames(dadjm) <- vars"; #label DAG matrix
-        @suppress R"gn <- as(dadjm, 'graphNEL')";                 # non-boot DAG matrix to graphNEL
 
-        @suppress R"ecpt <- extractCPT(df, gn, smooth = 0.01)";   # extract CPT from data, smooth NaN  
+        @suppress R"ecpt <- extractCPT(df, dadjm, smooth = 0.01)";   # extract CPT from data, smooth NaN  
         @suppress R"pt <- compileCPT(ecpt)";
         @suppress R"pnet <- grain(pt, propagate=TRUE)";           # make cpt net, propagated, copy
 
@@ -85,15 +84,17 @@ function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=sco
         else
             gso = replace(gs, "1" => "2", "2" => "1")
         end
+        
+        probout, jpout = ConProb(; f=f, fs=fs, g=g, gs=gs, vars=vars, verbose=false, rr_bootstrap=rr_bootstrap, type=type, query=query);
 
-        probout, jpout = ConProb(; f=f, fs=fs, g=g, gs=gs, vars=vars, verbose=false, rr_bootstrap=rr_bootstrap);
-
-        probout_o, jpout  = ConProb(; f=f, fs=fs,  g=g, gs=gso, vars=vars, verbose=false, rr_bootstrap=rr_bootstrap);
+        probout_o, jpout  = ConProb(; f=f, fs=fs,  g=g, gs=gso, vars=vars, verbose=false, rr_bootstrap=rr_bootstrap, type=type, query=query);
 
         RR_all = probout ./ probout_o
 
-        push!(RRdist, RR_all[fs])    #bootstrapped Relative Risk ratios
-        push!(PRdist, probout[fs])   #bootstrapped probabilities
+        #println("PO===>", probout, "   ", probout_o, "   ", RR_all)
+
+        push!(RRdist, RR_all)    #bootstrapped Relative Risk ratios
+        push!(PRdist, probout)   #bootstrapped probabilities
         
         @suppress R"rm(list = ls())"    #clear R workspace each run
         rm("bd_$z")
