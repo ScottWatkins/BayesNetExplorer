@@ -3,13 +3,14 @@
 
 Parse a conditional probability expression.    
 Return (targets, features, tt, ts, ff, fs) tuple.
-Last four return values are inputs for bne.
+
 """
 function queryparser(query::String)
 
     query = replace(query, " " => "")    # strip spaces
 
     if occursin(r"^P\(((.+)=(.+))\|((.+)=(.+))\)$", query)
+
         println("Query:$query")
         tf = split(query, r"\|")
         t = String.(split(tf[1][3:end], ","))
@@ -25,8 +26,11 @@ function queryparser(query::String)
         fs = [string.(split(i, "=")[2]) for i in f ]
 
         return(t, f, tt, ts, ff, fs)
+
     else
-        error("\n\nBad conditional query: \"$query\"\nQuery format is \"P(A=Astate|B=Bstate,C=Cstate,...)\"\n")
+
+        error("\n\nBad query: \"$query\"\n\nPlease use the standard query format, for example:\n \"P(A=a|B=b,C=c, ...)\" or \"P(A=a,B=b|C=c,D=d, ...)\" \n")
+
     end
 
 end

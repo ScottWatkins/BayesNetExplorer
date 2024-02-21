@@ -20,7 +20,7 @@ export bne
 export RRcalculator
 export plot_network
 export feature_selector
-export bnecpq
+export cpq
 export querywriter
 export queryparser
 export bnenbc
@@ -31,6 +31,7 @@ export correlation_analyzer
 export getRRtablerows
 export Colors
 export forestplot
+export merge_bne_cpq
 
 include("impute_dataframe.jl")
 include("format_file.jl")
@@ -62,5 +63,7 @@ include("bnescan.jl")
 include("getRRtablerows.jl")
 include("TwoSampleZtest.jl")
 include("forestplot.jl")
+include("benjhoc.jl")
+include("merge_bne_cpq.jl")
 
 end

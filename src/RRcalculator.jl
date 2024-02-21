@@ -1,31 +1,33 @@
 """
-    RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::Float64, translation_table::DataFrame=tt, mincondcount::Int=20, minp::Float=0.0, maxp::Float=1.0)
+    RRcalculator(dfp::DataFrame; target_state::String, target_state_freq::Float64, variable_table::DataFrame=vt, mincounts::Vector=[0,1], minp::Float=0.0, maxp::Float=1.0)
 
-Calculate the relative and absolute risk ratios from a conditional probability table generated with the bne function. Process and sort all targets and target conditions. Users may apply filters to help remove low confidence conditional probability queries.
+Calculate the relative and absolute risk ratios from a probability table generated with the bne iterate function. Process and sort all targets and target conditions. Users may apply filters to focus the results from a large probability space .
 
-All conditional variables in the input table must have exactly two states (e.g. 0/1 or true/false). The target variable can be multistate. All required inputs are generated from the bne() function. These include the main conditional probability table, the target state, the observed frequency of the target state, and the variable translation table. 
+**Input variables, dfp, target_state_freq, and variable_table are from the output of the bne() run.**
 
-Notes:
-1) mincounts is set to [1,20] by default but may need to be set lower if the data set is small or the target variable state has a low frequency (see discussion section in the manual).
-2) Combinations of  mutually exclusive (e.g., hot one encoded) combinations produce that produce zero counts will be omitted from the output.
+All conditional variables in the input table must have exactly two states (typically 1/2 or 0/1 or true/false). The target variable may be multistate. All required inputs are generated from the bne() function. These include the main conditional probability table, the target state, the observed frequency of the target state, and the variable table. 
 
-    Options:
-
+Options
+-------
         minp            minimum probability to report         [0.0001]
         maxp            maximum probability to report         [0.9999]
         filterstates    remove queries if conditional         ""
-                        variables contain this string
-        keep            keep queries if conditional           ""
+                        variable states contain the string
+        keep            keep queries if the conditional       ""
                         variable contain this string
         mincounts       min target and conditional counts     [1, 20]
         scols           array of col indices to sort output   [9,5]
 
     Example:
 
-        RRcalculator(cpt, target_state="Mortality_true", target_state_freq=0.01, translation_table=tt)
+        dfr = RRcalculator(dfp, target_state="Mortality_true", target_state_freq=0.01, variable_table=vf)
+
+Notes:
+1) mincounts is set to [0,1] by default, but users may need to adjust these values (see discussion section in the manual). Combinations of mutually exclusive (e.g., hot one encoded) combinations that produce zero counts will be removed from the output.
+
 
 """
-function RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::Float64, translation_table::DataFrame, filterstates::String="", keep::String="", minp::Float64=0.0001, maxp::Float64=0.9999,  mincounts::Array=[1,20], scols=[9,5] )
+function RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::Float64, variable_table::DataFrame, filterstates::String="", keep::String="", minp::Float64=0.0001, maxp::Float64=0.9999,  mincounts::Array{Int,1}=[0,1], scols::Array{Int,1}=[9,5] )
 
     if length(target_state_freq) < 1
         error("You must provide the baseline frequency of the target state observed in the whole dataset.\nThis is the population frequency over all samples.\n")
@@ -72,7 +74,7 @@ function RRcalculator(cpt::DataFrame; target_state::String, target_state_freq::F
     insertcols!(df_cpt, 5, :AbsRiskRatio => abs_r)
 
     df_cpt = dropmissing(df_cpt)
-    df_tt = translation_table
+    df_tt = variable_table
 
     ht = Dict()
 

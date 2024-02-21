@@ -1,7 +1,7 @@
 """
     forestplot(n::Vector, m::Vector, e1::Vector, e2::Vector)
 
-where n contains names, m contains values, e1 (& e2) contains the errors (m +/- e), and xlabel is the x-axis label. If error vectors are the actual plot values (e.g., CI95 values), set CI=true, otherwise use e1.
+where n contains names, m contains point estimates, e1 (& e2) contain the errors (m +/- e) values, and xlabel is the x-axis label. If error vectors are the actual CI plot values, e1 should have the lower values and e2 the upper values and set CI=true. otherwise use e1.
 
     Options
         markercolor        series1

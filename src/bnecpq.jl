@@ -1,42 +1,42 @@
 """
-    bnecpq(data, "P(Y=y1|X1=x1,X2=x2)")
+    cpq(data, "P(Y=y|X1=x1,X2=x2)")
 
-    Calculate an outcome probablity for variable, Y, given one or more conditional variables from some body of evidence X.
+Calculate an outcome probablity for the event Y=y given one or more conditional variables X1, X2, ... Xn from some body of evidence X.
 
-    Probabilities are estimated directly from the co-occurence of events in the data. The expression, P(Y=Yes|X1=Yes,X2=No), is queried as fraction of Y=Yes events in the subset of the data where X1 is Yes and X2 is No.
- 
-    Inputs: a csv file or dataframe and the probability query. The input data must have sample labels in column 1, and all columns must be labeled. For idinfo metatdata, sample ids must be in column 1 of the csv file.
+Inputs: a csv file or dataframe and the probability query. The input data must have sample ids in column 1, and all columns must be labeled. Provide optional metatdata for samples in a separate file with sample ids in column 1.
 
-Currently, only binary conditional variables are allowed. Laplace corrected risk ratios are provided. Outfiles can be made for scripting multiple bootstrap runs.
+Probabilities are estimated directly from the co-occurence of events in the data. The expression, P(Y=Yes|X1=Yes,X2=No), is queried as fraction of Y=Yes events in the subset of the data where X1 is Yes and X2 is No. Currently, only binary conditional variables are allowed. Laplace correction is use for zero count events.
 
     Keyword options:
         digits           Round to n digits                      [4]    
-        outfile          Output file                            ""  
+        outfile          Output file (appendable)               ""  
         outfile2         Simple output of ARR or RRR            ""   
         bootstraps       Number of replicates                   [100]  
         k                Laplace correction factor              [1.0]  
         mincounts        min target and conditional count flag  [1, 20]
         showids          Show target ids for query              false
         idinfo           Show additional info for target ids    ""
-                         input is csv file of metadata for ids 
+                         Input is csv file of metadata for ids 
         rrrdenom         Custom rel. risk ratio coditional      []
                          states for the denominator
                          (e.g., ["Yes", "No", "Yes"])
                          default: all conditional states negated
-        confmeth         distribution model for CI95            "t-dist|empirical"
-        binomial         simple binomial test                    false
+        confmeth         Distribution model for CI95        "empirical|t-dist"
+        showhist         Display the ARR distribution            false 
+        binomial         Binomial test of target counts          false
         fisher           Fisher test for ARR and RRR             false
 
-Example query:  bnecpq(df, "P(Play=Yes|Forecast=Sunny,Wind=Yes)")
+Example query:  cpq(df, "P(Play=Yes|Forecast=Sunny,Wind=Yes)")
                 The conditional probability of Play given Sunny and Wind.
-Example query2: bnecpq(df, "P(Play=Yes, Forecast=Sunny|Wind=Yes)")
-                The conditional probability of Play & Sunny given Wind
-                Play and Forcast are merged into a single variable.
 
-The fisher and binomial tests should be interpreted with caution. Underlying assumptions of may not hold, expecially for complex queries.
+Example query2: cpq(df, "P(Play=Yes, Forecast=Sunny|Wind=Yes)")
+                The conditional probability of Play & Sunny given Wind.
+                The Play and Forcast are merged into a single variable.
+
+Notes: The Fisher and Binomial tests may be used initially as general guide for the interpretion of results, howevet, the underlying assumptions of variable independence is violated. Using the t-distribution is only recommend for queries with target size (e.g. < 30).
 
 """
-function bnecpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::Number=1, outfile::String="", bootstraps::Int64=0, mincounts::Array=[1,20], showids=false, outfile2::String="", rrrdenom::Array=[], confmeth="t-dist", binomial::Bool=false, fisher::Bool=false, idinfo::String="")
+function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::Number=1, outfile::String="", bootstraps::Int64=0, mincounts::Array=[1,20], showids=false, outfile2::String="", rrrdenom::Array=[], confmeth="empirical", binomial::Bool=false, fisher::Bool=false, idinfo::String="", showhist::Bool=false)
 
     digits > 8 ? error("Significant digits maximum is 8 digits.") : "";
     line = "-"^72
@@ -58,7 +58,7 @@ function bnecpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k
         end
         println("Using relative risk denominator states: $rrrdenom.")
     end
-
+    
 
     if typeof(data) == DataFrame     #read data
 
@@ -71,7 +71,7 @@ function bnecpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k
             nnc = Symbol(nn)
             nd = Int64.(ones(size(data,1)))
             vu = string.(unique(data[!, Symbol(z[3][1])] ))
-
+            
             if length(z[1]) == 2
 
                 for row in eachindex(nd)
@@ -112,7 +112,8 @@ function bnecpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k
         
         length(z[1]) > 1 ? error("\n\nDataframe input required for multitarget query\n\n.") : nothing
         
-        global df = CSV.read(data, DataFrame, normalizenames=true, types=String, select=newcols)
+        global df = CSV.read(data, DataFrame, normalizenames=true, types=String, select=newcols);
+
         ids = df[!,1]
 
     else
@@ -262,6 +263,10 @@ function bnecpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k
         rel_risk_ratio =  t_feat_f / t_feat_f_fopp
 
         fmt = join(["%.", digits, "f"], "")  # printf format string
+        btpval = missing
+        ftpvals = [missing, missing, missing]
+
+
         
         if cc == 0   #print the exact, non-bootstrapped counts and frequencies
 
@@ -285,47 +290,82 @@ function bnecpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k
             if t_feat_c == 0
                 printstyled("WARN: zero final counts observed. These results are only a prediction!\n", color=:yellow)
             end
-
+            
             cc = cc + 1
             println(line)
 
-            if binomial == true
-                printstyled("-----------------------Binomial test of significance:-------------------\n", color=:cyan)
-                println(line)
-                bt = BinomialTest(t_feat_c, all_c_cond, parse.(Float64, targ_f))
-                println(bt)
-                println(line)
-            end
+            btpval = missing
+            ftpvals = [missing, missing, missing, missing, missing, missing]
 
-            if fisher == true
+            if all_c_cond == 0  #Exact tests: Binomial and Fisher
+
+                println("\n\nWARN: Zero conditional counts!\nSkipping exact tests for $query.\nAre the requested conditionals mutually exclusive?\n\n") 
                 
-                printstyled("---------------- Absolute risk ratio: Fisher evaluation ----------------\n", color=:green)
-                println(line)
-                numall = all_c_cond - t_feat_c 
-                arrdenom = all_c - targ_c
-                arrft = FisherExactTest(t_feat_c, targ_c, numall, arrdenom);
-                arrpvall = round(pvalue(FisherExactTest(t_feat_c, targ_c, numall, arrdenom), tail=:left ), digits=digits)
-                arrpvalr = round(pvalue(FisherExactTest(t_feat_c, targ_c, numall, arrdenom), tail=:right ), digits=digits)
-                arrpvalb = round(pvalue(FisherExactTest(t_feat_c, targ_c, numall, arrdenom), tail=:both ), digits=digits)
-                println(arrft)
-                println("P-values:\n    Both-tails:   $arrpvalb\n    Left-tailed:  $arrpvall\n    Right-tailed: $arrpvalr\n\n")
-                println(line)
+            else
 
+                dd = 1/10^digits
 
-                #Fisher relative risk ratio
-                printstyled("------------ Relative risk ratio: Fishers Exact evaluation -------------\n", color=:cyan)
-                println(line)
-                numall = all_c_cond - t_feat_c
-                denomall = all_c_opp - t_feat_c_fopp
-                ft = FisherExactTest(t_feat_c, t_feat_c_fopp, numall, denomall);
-                pvall = round(pvalue(FisherExactTest(t_feat_c, t_feat_c_fopp, numall, denomall), tail=:left ), digits=digits)
-                pvalr = round(pvalue(FisherExactTest(t_feat_c, t_feat_c_fopp, numall, denomall), tail=:right ), digits=digits)
-                pvalb = round(pvalue(FisherExactTest(t_feat_c, t_feat_c_fopp, numall, denomall), tail=:both ), digits=digits)
-                println(ft)
-                println("P-values:\n    Both-tails:   $pvalb\n    Left-tailed:  $pvall\n    Right-tailed: $pvalr")
-                println(line)
+                if binomial == true
+                    printstyled("-----------------------Binomial test of significance:-------------------\n", color=:cyan)
+                    println(line)
+                    bt = BinomialTest(t_feat_c, all_c_cond, parse.(Float64, targ_f))
+                    btpval = round(pvalue(BinomialTest(t_feat_c, all_c_cond, parse.(Float64, targ_f))), digits=digits)
+                    #bt95int = round.(confint(BinomialTest(t_feat_c, all_c_cond, parse.(Float64, targ_f))),  digits=digits)
+                    btpval <= dd ? btpval = dd : btpval = btpval
+                    
+                    println(bt)
+                    println(line)
+                end
+                
+                if fisher == true
+                
+                    printstyled("---------------- Absolute risk ratio: Fisher evaluation ----------------\n", color=:green)
+                    println(line)
+                    
+                    numall = all_c_cond - t_feat_c 
+                    arrdenom = all_c - targ_c
+                    
+                    println("FisherExactTest($t_feat_c, $targ_c, $numall, $arrdenom);")
+
+                    arrft = FisherExactTest(t_feat_c, targ_c, numall, arrdenom);
+
+                    arrpvall = round(pvalue(FisherExactTest(t_feat_c, targ_c, numall, arrdenom), tail=:left ), digits=digits)
+                    arrpvalr = round(pvalue(FisherExactTest(t_feat_c, targ_c, numall, arrdenom), tail=:right ), digits=digits)
+                    arrpvalb = round(pvalue(FisherExactTest(t_feat_c, targ_c, numall, arrdenom), tail=:both ), digits=digits)
+
+                    arrpvall <=  dd ? arrpvall = dd : arrpvall = arrpvall
+                    arrpvalr <= dd ? arrpvalr = dd : arrpvalr = arrpvalr
+                    arrpvalb <= dd ? arrpvalb = dd : arrpvalb = arrpvalb
+
+                    println(arrft)
+                    println("P-values:\n    Both-tails:   $arrpvalb\n    Left-tailed:  $arrpvall\n    Right-tailed: $arrpvalr\n\n")
+                    println(line)
+                    
+                    #Fisher relative risk ratio
+                    printstyled("------------ Relative risk ratio: Fishers Exact evaluation -------------\n", color=:cyan)
+                    println(line)
+                    numall = all_c_cond - t_feat_c
+                    denomall = all_c_opp - t_feat_c_fopp
+                    #println("FisherExactTest($t_feat_c, $t_feat_c_fopp, $numall, $denomall);")
+
+                    ft = FisherExactTest(t_feat_c, t_feat_c_fopp, numall, denomall);
+
+                    rrrpvall = round(pvalue(FisherExactTest(t_feat_c, t_feat_c_fopp, numall, denomall), tail=:left ), digits=digits)
+                    rrrpvalr = round(pvalue(FisherExactTest(t_feat_c, t_feat_c_fopp, numall, denomall), tail=:right ), digits=digits)
+                    rrrpvalb = round(pvalue(FisherExactTest(t_feat_c, t_feat_c_fopp, numall, denomall), tail=:both ), digits=digits)
+                    
+                    rrrpvall <= dd ? rrrpvall = dd : rrrpvall = rrrpvall
+                    rrrpvalr <= dd ? rrrpvalr = dd : rrrpvalr = rrrpvalr
+                    rrrpvalb <= dd ? rrrpvalb = dd : rrrpvalb = rrrpvalb
+
+                    println(ft)
+                    println("P-values:\n    Both-tails:   $rrrpvalb\n    Left-tailed:  $rrrpvall\n    Right-tailed: $rrrpvalr")
+                    println(line)
+
+                    ftpvals = [ arrpvalb, arrpvall, arrpvalr, rrrpvalb, rrrpvall,  rrrpvalr] 
+
+                end
             end
-            
             
             if showids == true 
 
@@ -334,7 +374,7 @@ function bnecpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k
                 
                 if length(idinfo) > 0
 
-                    dfi = CSV.read(idinfo, DataFrame, types=String)
+                    dfi = CSV.read(idinfo, DataFrame, types=String);
                     tids_a = split(tids, ",")
                     sinfo = DataFrame([name => [] for name in names(dfi)])
 
@@ -360,13 +400,18 @@ function bnecpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k
             end
         end
         
-        return (([targ_f abs_risk_ratio lp_abs_risk_ratio rel_risk_ratio lp_rel_risk_ratio], [targ_c, all_c], [t_feat_c cond_c], [t_feat_c_fopp, all_c_opp], [t_c_adj, a_c_adj, t_c_opp_adj, a_c_opp_adj], [tids] )  )
+        return (([targ_f abs_risk_ratio lp_abs_risk_ratio rel_risk_ratio lp_rel_risk_ratio], [targ_c, all_c], [t_feat_c cond_c], [t_feat_c_fopp, all_c_opp], [t_c_adj, a_c_adj, t_c_opp_adj, a_c_opp_adj], [tids] ) ), btpval, ftpvals
         
     end
 
-    rvals = runbnecpq(df, newcols, z)
+    rvals, btpval, ftpvals = runbnecpq(df, newcols, z)  # Main run
 
-    function bnecpqbootstrap(dfg, bootstraps, rvals) # Input must be original df
+    if rvals[3][1] > 30 && confmeth == "t-dist"
+        error("\n\nFinal target count > 30  for this probability query.\nPlease use confmeth=\"empirical\"\n\n")
+    end
+    
+    
+    function bnecpqbootstrap(dfg, bootstraps, rvals, btpval, ftpvals) # Input must be original df
 
         if confmeth == "t-dist" || confmeth == "empirical"
         else
@@ -377,25 +422,25 @@ function bnecpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k
         if length(rrrdenom) > 0
             println(HOUT, "##IMPORTANT: Denominator for relative risk calculations was set to $rrrdenom")
         end
-        
-        println(HOUT, "Query\tEstimateType\tMedianEstimate\tCI95l\tCI95u\tFinalCount\tCondCount\tTargCountOK\tCondCountOK\tSignificant\tRawTargCounts\tQueryOK")
+        println(HOUT, "Query\tCount\tCondCount\tcpq_ARR_est\tcpq_ARR_CI95l\tcpq_ARR_CI95u\tcpq_RRR_est\tcpq_RRR_CI95l\tcpq_RRR_CI95u\tBinomial_pval\tARR_Fisher_2t_pval\tARR_Fisher_1t_left\tARR_Fisher_1t_right\tRRR_Fisher_2t_pval\tRRR_Fisher_1t_left\tRRR_Fisher_1t_right")
         close(HOUT)
         
         if bootstraps > 0
             
-            if 1 < bootstraps < 99
-                error("\n\nUse at least 100 bootstraps for bootstrap estimates.\n\n")
+            if bootstraps < 100
+                error("\n\nPlease use at least 100 bootstraps.\n\n")
             end
             
             B = Array{Float64, 2}(undef, bootstraps, 5)
-            
+
             for i in 1:bootstraps
                 df = dfg[rand(1:nrow(dfg), size(dfg,1)), :]
                 b = runbnecpq(df, newcols, z)
+                b = b[1]
                 B[i,:] = b[1]              #2D array of resampled values
                 cc = cc + 1
             end
-            
+
             replace!(B, Inf=>NaN)  #set Inf to NaN and then filter invalid bootstraps
             
             B = sort(B, dims=1)
@@ -404,32 +449,52 @@ function bnecpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k
             B3 = filter(!isnan, B[:,3])
             B4 = filter(!isnan, B[:,4])
             B5 = filter(!isnan, B[:,5])
-            
+
             function myconfint(data, bootstraps, digits)
 
                 if length(data) < (bootstraps * 0.5)
                     e = -0.0; lc = -0.0; uc = -0.0
+                   
                 else
-                    e = round(median(data), digits=digits)
+
+                    e = round(mean(data), digits=digits)
+
                     if confmeth == "t-dist"
+
+                        #x = histogram(data)
+                        #display(x)
+                        #error("STOP")
+                        N = rvals[3][1] # ν based on target count
+                        N < 2 ? N = 2 : N = N # prevent ν domian error
+                        
                         estd = std(data)
-                        ci = confint(OneSampleTTest(e, estd, length(data)), level=0.95)
+                        ci = confint(OneSampleTTest(e, estd, N), level=0.95)
                         lc = round.(ci[1], digits=digits)
                         uc = round.(ci[2], digits=digits)
+                        lc < 0.0 ? lc = 0.0 : lc = lc
                     else
-                        lc = data[Int64( ceil(length(data) * 0.025))]
-                        uc = data[Int64(floor(length(data) * 0.975))]
+                        lc = quantile(data, 0.025)
+                        uc = quantile(data, 0.975)
                     end
+
+                    if showhist == true
+                        plt = histogram(data, bins=50, xlabel="ARR score", ylabel="Observations ($bootstraps)", label="ARR estimates")
+                        vline!([e], label="ARR average ($e)", width=1.0)
+                        display(plt)
+                    end
+                    
                 end
                 
                 return e, lc, uc                
+
             end
 
             TF, TFlc, TFuc = myconfint(B1, bootstraps, digits)   #get estimates and CI95s
-            ARR, ARRlc, ARRuc = myconfint(B2, bootstraps, digits)
             lp_ARR, lp_ARRlc, lp_ARRuc = myconfint(B3, bootstraps, digits)
             RRR, RRRlc, RRRuc = myconfint(B4, bootstraps, digits)
             lp_RRR, lp_RRRlc, lp_RRRuc = myconfint(B5, bootstraps, digits)
+
+            ARR, ARRlc, ARRuc = myconfint(B2, bootstraps, digits)  #ARR last for showhist
             
             if cc == bootstraps + 1
 
@@ -445,7 +510,7 @@ function bnecpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k
                     println("-"^70)
                 end
                 
-                println("Distribution median and CI95 for $bootstraps bootstraps")
+                println("Distribution average and CI95 for $bootstraps bootstraps")
                 println("-"^70)
                 println("Abs risk        $TF($TFlc, $TFuc)")
                 println("ARR             $lp_ARR($lp_ARRlc, $lp_ARRuc)")
@@ -525,11 +590,15 @@ function bnecpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k
                         if bootstraps < 1
                             error("Bootstrapping must be used for file output.")
                         end
-                                                
+
+                        # Binomial test and FisherTest vals
+                        arrb = ftpvals[1]; arrl = ftpvals[2]; arrr = ftpvals[3]
+                        rrrb = ftpvals[4]; rrrl = ftpvals[5]; rrrr = ftpvals[6]
+
                         OUT = open(outfile, "a")
-                        println(OUT, "$query\tARR (adj)\t$lp_ARR\t$lp_ARRlc\t$lp_ARRuc\t$t_c_adj\t$a_c_adj\t$mintarg2\t$v2\t$s2\t$targcounts\t$badflag")
-                        println(OUT, "$query\tRRR (adj)\t$lp_RRR\t$lp_RRRlc\t$lp_RRRuc\t$t_c_adj\t$a_c_adj\t$mintarg4\t$v4\t$s4\t$targcounts\t$badflag")
+                        println(OUT, "$query\t$t_c_adj\t$a_c_adj\t$lp_ARR\t$lp_ARRlc\t$lp_ARRuc\t$lp_RRR\t$lp_RRRlc\t$lp_RRRuc\t$btpval\t$arrb\t$arrl\t$arrr\t$rrrb\t$rrrl\t$rrrr")
                         close(OUT)
+
                     end
                     
                     if length(outfile2) > 0
@@ -553,13 +622,14 @@ function bnecpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k
 
     end            # end bnecpqbootstrap
 
-    bnecpqbootstrap(df, bootstraps, rvals)
+    bnecpqbootstrap(df, bootstraps, rvals, btpval, ftpvals)
     
     fids = ""
 
     if showids
         fids = String.(split(rvals[6][1], r",")) 
     end
+
 
     arr = parse.(Float64, string.(strip(rvals[1][3]) ))
     rrr = parse.(Float64, string.(strip(rvals[1][5]) ))

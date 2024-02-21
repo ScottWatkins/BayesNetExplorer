@@ -1,11 +1,14 @@
 """
     plot_network(adjM; headerfile, fnode(s), gnodes, DAG=true, nodeshape=:circle )
 
-    Plot a network using an adjacency matrix. Node names can be taken from the first line of a space delimited file (e.g., BN.header) as the. Required: adjacency matrix.
+    Plot a network using an adjacency matrix. Node names can be taken from the first line of a space delimited file (e.g., BN.header).
 
-    Options
+    Required kwargs
+
         headerfile    space delim file            "filename"
         fnode         color target node           "nodename" | [node1, node2] 
+
+    Optional kwargs
         gnodes        color nodes in array        ["node1", "node2"]
         bnodes        color nodes in array        ["node1", "node2"]
         cnodes        color node in array         ["node1", "node2"]
@@ -24,28 +27,29 @@
         nodesize      node scalar                 [0.05]
         nodenames     optional node names         []
                       (names must be strings)
+        fontsize      fontsize for labels         5
         linewidth     size of lines               1.5
         curves        curve the arcs              false
         curvescale    amplitude of curve          0.03
         dims          2 or 3-dimensions           2
         edgelabel     matrix for edge labels      []
-        edgewidth     matrix of edge widths       [2.0 ...; ... 2.0]               
+        edgewidth     matrix of edge widths       [2.0 ...; ... 2.0]
         boxcolor      color for edge label box    :white
         moral_line    width of add moral lines    1.5
 
 Notes:
 1. Edgelabel is a string matrix that matches the DAG adjM.
-   1. "" indicates no edge label.
-   2. If the adjM position has a 1, the edgelabel matrix
+   a. "" indicates no edge label.
+   b. If the adjM position has a 1, the edgelabel matrix
       can have a corresponding label. See (2) for input info.
-   3. The edgelabels matrix will be automatically converted
+   c. The edgelabels matrix will be automatically converted
       to symmetric if DAG=false.
 2. Input non-symetric matrices have directional arcs.
-      From row index -> to col index
+   a. Arrow direction is From row index -> to col index
 3. If the matrix is symmetrical, the graph is non-directional.      
-
+4. Use fontsize and nodesize to adjust the font to fit the node.
 """
-function plot_network(adjM::Matrix; headerfile::String="", fnode::Union{String,Array}, gnodes::Array=[], bnodes::Array=[], cnodes::Array=[], dnodes::Array=[], DAG::Bool=true,  nodeshape::Symbol=:circle, method::Symbol=:stress, trimnames::Int=10, fontsize::Number=5, nodesize::Float64=0.06, curves::Bool=false, dims::Int64=2, ncolors::Array=[:orange, :skyblue1, :lightgoldenrod1, :palegreen3, :grey80], moralize::Bool=false, nodenames::Array=[], curvescale::Float64=0.03, edgelabel::Array=[], edgewidth::Array=[], node_weights::Vector=[], boxcolor::Symbol=:white, linewidth::Float64=1.0, moral_line::Float64=1.5 )
+function plot_network(adjM::Matrix; headerfile::String="", fnode::Union{String,Array}, gnodes::Array=[], bnodes::Array=[], cnodes::Array=[], dnodes::Array=[], DAG::Bool=true,  nodeshape::Symbol=:circle, method::Symbol=:stress, trimnames::Int=10, fontsize::Number=5, nodesize::Float64=0.06, curves::Bool=false, dims::Int64=2, ncolors::Array=[:orange, :skyblue1, :lightgoldenrod1, :palegreen3, :grey80], moralize::Bool=false, nodenames::Array=[], curvescale::Float64=0.03, edgelabel::Array=[], edgewidth::Array=[], node_weights::Vector=[], boxcolor::Symbol=:white, linewidth::Float64=1.0, moral_line::Float64=1.5,  )
     
     if typeof(fnode) == String
         fnode = [fnode]
@@ -62,8 +66,13 @@ function plot_network(adjM::Matrix; headerfile::String="", fnode::Union{String,A
         println(nodenames)
     end
 
-    if length(nodenames) < 7
-        nodesize::Float64=0.04
+    if length(nodenames) < 3
+        nodesize = 0.02
+    elseif length(nodenames) < 4
+        nodesize = 0.03
+    elseif length(nodenames) < 7
+        nodesize = 0.04
+    else
     end
     
     if DAG == true && moralize == true

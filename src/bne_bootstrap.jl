@@ -7,7 +7,7 @@
 
     Note that for each iteration, individuals are randomly resampled, and a new network is remade. Therfore, speed decreases very rapidly as the number of nodes increases.  
 """
-function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=scoring_method, f=f, fs=fs, g=g, gs=gs, bootstrap=0, iterate="", minfreq=0.00, verbose=false, rr_bootstrap=rr_bootstrap, bootstrap_method=boostrap_method, boot_plot=boot_plot, confmeth=confmeth, rrrdenom=rrrdenom, type=type, query=query)
+function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=scoring_method, f=f, fs=fs, g=g, gs=gs, bootstrap=0, iterate="", minfreq=0.00, verbose=false, rr_bootstrap=rr_bootstrap, bootstrap_method=boostrap_method, boot_plot=boot_plot, confmeth=confmeth, rrrdenom=rrrdenom, type=type, query=query, targc_all=targc_all)
 
     if 1 < rr_bootstrap < 10
         printstyled("INFO::For better accuracy, use at least 100 rr_bootstrap replicates.\n", color=:yellow)
@@ -105,17 +105,27 @@ function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=sco
     RRdiststd = std(RRdist)
 
     if confmeth == "t-dist"
-        RR_est = median(RRdist)
-        lower, upper = confint(OneSampleTTest(RR_est, RRdiststd, rr_bootstrap), level=0.95)
+
+        N = targc_all        # set ν on target count
+        N < 2 ? N = 2 : N=N  # prevent ν domain error
+        
+        RR_est = mean(RRdist)
+
+        lower, upper = round.(confint(OneSampleTTest(RR_est, RRdiststd, N), level=0.95), digits=4)
+
         if lower < 0
             lower = 0.0
         end        
+
         CI95 = (round(lower, digits=4), round(upper, digits=4))
+
     elseif confmeth == "empirical"
+
         RR_est = median(RRdist)
         upper = RRdist[ Int(floor(length(RRdist) * 0.975)) ]
         lower = RRdist[ Int(ceil(length(RRdist) * 0.025))  ]
         CI95 = (round(lower, digits=4), round(upper, digits=4))
+
     end
 
     return CI95, PRdist, RR_est
