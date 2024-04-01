@@ -325,8 +325,6 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
                     numall = all_c_cond - t_feat_c 
                     arrdenom = all_c - targ_c
                     
-                    println("FisherExactTest($t_feat_c, $targ_c, $numall, $arrdenom);")
-
                     arrft = FisherExactTest(t_feat_c, targ_c, numall, arrdenom);
 
                     arrpvall = round(pvalue(FisherExactTest(t_feat_c, targ_c, numall, arrdenom), tail=:left ), digits=digits)
