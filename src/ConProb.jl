@@ -2,7 +2,7 @@
     Dependent function. This function is used within bne.jl to calculate conditional probability. Note user defined rrr denominator is passed in as gs. This function cycles twice in bne to get the initial query and then the negated query for the relative risk denominator.
 
 """
-function ConProb(;f=f, fs=fs, g=g, gs=gs, type=type, vars=vars, verbose=false, rr_bootstrap=rr_bootstrap, query=query) # get P(feature|g1, g2, ... gn)
+function ConProb(;f=f, fs=fs, g=g, gs=gs, type=type, vars=vars, verbose=verbose, rr_bootstrap=rr_bootstrap, query=query) # get P(feature|g1, g2, ... gn)
 
     if length(g) != length(gs)
         println("\nMismatched conditional query:\ng elements: ", length(g), " but gs elements: ", length(gs))
@@ -39,54 +39,74 @@ function ConProb(;f=f, fs=fs, g=g, gs=gs, type=type, vars=vars, verbose=false, r
 
     gstates = join(["c(", gstates[2:end], ")"] , "") # done creating strings 
 
-    # NOTES: setting type="marginal" for P(xray=2,bronc=2|smoke=2) returns 
-    # values similar values as cpq for P(xray=1,2|smoke=2) and P(bronc=1,2|smoke=2).
-    # For "P(xray=2|smoke=2,bronc=2)", marginal and conditional match cpq 
-    # For "P(A=2,B=1,C=2,D=1|Y=2,Z=2)" the final P-value is in grq[2,1,2,1], etc.
-    # The propagated values can be very different than cpq especially if
-    # ANY nodes are not in same markov blanket.  
-    
-    #println("f $f | fnodes $fnodes | g $g |gnodes: $gnodes | gs $gs |  gstates: $gstates")
-    
     R"f <- $fnodes"
     R"g <- $gnodes"; R"gs <- $gstates"
 
     # Here the compiled net get set for gstates of gnodes, that is smoke=yes means
-    # the net is set for smoke=1.0. The net is then propogated.
-    #println("ev_net1 <- setEvidence(pnet, nodes = $gnodes, states = $gstates, propagate=TRUE )" )
+    # the net is set for P(smoke=1.0). The net is then propogated.
+    # println("ev_net1 <- setEvidence(pnet, nodes = $gnodes, states = $gstates, propagate=TRUE )" )
 
     R"ev_net1 <- setEvidence(pnet, nodes = $g, states = $gs, propagate=TRUE )"   #set states
 
     # The final query is made for one or more target nodes
-    grq = rcopy(R"grq = querygrain(ev_net1, nodes = $f, type=$type)");
+    R"querygrain(ev_net1, nodes = $f, type=$type)"
 
+    R"grq = querygrain(ev_net1, nodes = $f, type=$type)"
+    dname = rcopy(R"dname = dimnames(grq)")  #dname is ordered dict from grain
+
+    ff = Symbol.(f)
+
+    if typeof(ff) == Symbol 
+        ffs = Dict(ff => fs)        
+    elseif typeof(ff) == Vector{Symbol}
+        ffs = Dict(zip(ff, fs))    # input targets
+    end
+    
+    gr_idx = []                # empty index
+                               # Input target-state must be *matched* to grain matrix!
+                               # population new index based on grain
+
+    if type == "joint" || type == "conditional"
+        for k in keys(dname) 
+            i = get(ffs, k, 0)
+            if typeof(i) == String
+                i = parse(Int64, i)
+            end
+            push!(gr_idx, i)
+
+        end
+    end
+    
+    grq = rcopy(R"grq = querygrain(ev_net1, nodes = $f, type=$type)");
+        
     #Note: ev_net1 is propagated, qrq query P(feature|g1,g2,... is from the propagated net)
 
     c = ""
     
-    if verbose == true
-        println("$('-'^75)")
-        for i in 1:length(g)
-            c = c * g[i] * "=" * gs[i] * ","
-        end
-        c = c[1:end-1]
+   if verbose == true && rr_bootstrap == 0 
+       println("$('-'^75)")
+       for i in 1:length(g)
+           c = c * g[i] * "=" * gs[i] * ","
+       end
+       c = c[1:end-1]
+       
+       println("$query\n")
+       println("Listing all target probabilities...")
+       R"print(grq)"
+       println("$('-'^75)")
 
-        
-        println("$query\n")
-        R"print(grq)"
-        println("$('-'^75)")
-    end
+   end
     
     probout = grq
-    
-    jpout = join([f, probout, join(string.(g), ","), join(string.(gs), ",") ], "|")
 
+    jpout = join([f, probout, join(string.(g), ","), join(string.(gs), ",") ], "|")
+        
     if rr_bootstrap > 0
-        boot_pF = probout[CartesianIndex(Tuple(fs))] #index to allow multi-target queries
+        boot_pF = probout[CartesianIndex(Tuple(gr_idx))]   #index to grain target probability
         probout = boot_pF
         jpout = probout
     end
     
-    return probout, jpout
+    return probout, jpout, gr_idx
 
 end

@@ -22,7 +22,7 @@ function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=sco
     vardat = readlines("$header")
     headdat = replace(readline("$header"), "\"" => "")
     headdat = String.(split(headdat, r"\s+"))
-    numstates = parse.(Int64, split(vardat[2]))
+    #numstates = parse.(Int64, split(vardat[2]))
     types = split(vardat[3])
 
     dfcleaned, df_freq = clean_dfvars_by_frequency("$data", minfreq; nolabels=true, delim=" ", header=headdat)
@@ -30,7 +30,8 @@ function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=sco
     RRdist = Float64[]   
     PRdist = Float64[]
     fs = parse.(Int, fs)
-
+    bM = []
+    
     print("Bootstrapping: ")        
 
     for z in 1:rr_bootstrap
@@ -72,9 +73,11 @@ function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=sco
         @suppress R"pt <- compileCPT(ecpt)";
         @suppress R"pnet <- grain(pt, propagate=TRUE)";           # make cpt net, propagated, copy
 
+        adjM = rcopy(R"dadjm <- net@dag")
+        adjM = Int.(adjM)
+        push!(bM, adjM)
+        
         if boot_plot == true
-            adjM = rcopy(R"dadjm <- net@dag")
-            adjM = Int.(adjM)
             plt = plot_network(adjM, headerfile="BN.header", fnode=f, gnodes=g )
             display(plt)
         end
@@ -85,9 +88,9 @@ function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=sco
             gso = replace(gs, "1" => "2", "2" => "1")
         end
         
-        probout, jpout = ConProb(; f=f, fs=fs, g=g, gs=gs, vars=vars, verbose=false, rr_bootstrap=rr_bootstrap, type=type, query=query);
+        probout, jpout, gr_idx = ConProb(; f=f, fs=fs, g=g, gs=gs, vars=vars, verbose=false, rr_bootstrap=rr_bootstrap, type=type, query=query);
 
-        probout_o, jpout  = ConProb(; f=f, fs=fs,  g=g, gs=gso, vars=vars, verbose=false, rr_bootstrap=rr_bootstrap, type=type, query=query);
+        probout_o, jpout, gr_idx  = ConProb(; f=f, fs=fs,  g=g, gs=gso, vars=vars, verbose=false, rr_bootstrap=rr_bootstrap, type=type, query=query);
 
         RR_all = probout ./ probout_o
 
@@ -128,6 +131,6 @@ function bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=sco
 
     end
 
-    return CI95, PRdist, RR_est
+    return CI95, PRdist, RR_est, bM, RRdist
 
 end

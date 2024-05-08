@@ -6,14 +6,14 @@ Return the markov blanket of a target node for a DAG. Features is an array with 
 function get_markov_blanket(DAG::Matrix, features::Array{String}, target::Union{String,Int, Array} )
     
     function process_target(DAG::Matrix, features::Array{String}, target::Union{String,Int,Array} )
-    
-        if typeof(target) == String
-            target = findall(occursin.(target, features))
-            target = target[1] 
+
+        if  typeof(target) == String
+            target = findall(occursin.(Regex("^$target\$"), features))
+            target = target[1]
             println("Target index is $target")
-        elseif typeof(target) == Int
-        label = features[target]
-            println("Target label is $label")
+        elseif typeof(target) == Vector{Int}
+            label = features[target]
+            println("Target indices are $target")
         end
         
         mb = Int.(zeros(size(DAG)))  
@@ -24,9 +24,8 @@ function get_markov_blanket(DAG::Matrix, features::Array{String}, target::Union{
         for i in 1:size(DAG, 1)
             for j in 1:size(DAG, 2)
                 if i == target && DAG[i,j] > 0 # is offspring
-                    if sum(DAG[:,j]) > 1       # offspring has parent(s)
+                    if sum(DAG[:,j]) > 1   # offspring has parent(s)
                     mb[:, j] = DAG[:, j]   # add parent of offspring of target 
-                        #println("==>", i, " ", j, " ", DAG[:,j])
                     end
                 end
             end

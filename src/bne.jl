@@ -5,12 +5,12 @@ Explore and analyze data using a Bayesian network.
 
 Return values
 -------------
-dfp -- a dataframe of query probabilities \\
-vt  --   a dataframe of all variable and their frequencies \\
-tf  --   an arrary of frequecies for the target node \\
-adjM --  the network adjacency matrix \\
-adjMb -- the adjacency matrix for the target's Markov blanket \\
-p -- an array containing node names and the inferred probabilities \n
+dfp      dataframe of query probabilities \\
+vt       dataframe of all variable and their frequencies \\
+tf       array of frequecies for the target node \\
+adjM     network adjacency matrix \\
+adjMb    adjacency matrix for the target's Markov blanket \\
+p        array containing node names and the inferred probabilities \n
 
 Options
 -------
@@ -32,8 +32,8 @@ Options
     
     Probability options:
 
-        iterate          Iterate network nodes and states       [nodes|all]
-        relrisk          Calculate the abs. and rel. risk       [false]
+        iterate      Iterate network nodes and states       [nodes|all]
+        relrisk      Calculate the abs. and rel. risk       [false]
                      
     Bootstrapping options
 
@@ -41,7 +41,7 @@ Options
         bootstrap_method    resample or delete half             [resample]
         bootout             write and append results to file    ""
         boot_plot           show plot for each bootstrap        false
-        showhist            display histogram of ARR estimates  false
+        showhist            show histogram of bootstraps        :ARR | :RRR
 
     Plot options
 
@@ -51,12 +51,12 @@ Options
 
     Misc options:
 
-        minfreq             min variable frequency              [0.0]
-        verbose             verbose output                      [false]
-        confmeth            CI95 method                       [empirical|t-dist]
-        rrrdenom            specify target states for the       []
-                            relative risk ratio denominator.
-                            Default: all query states negated.
+        minfreq      min variable frequency              [0.0]
+        verbose      add additional evaluation info      [false]
+        confmeth     CI95 method                      [empirical|t-dist]
+        rrrdenom     specify target states for the       []
+                     relative risk ratio denominator.
+                     Default: all query states negated.
 
 Using the BayesNetExplorer
 --------------------------
@@ -88,7 +88,7 @@ For networks larger than 15 nodes, please use non-exact algorithms (e.g., hc) an
 Multitarget conditional queries are possible. Most users will want the multitarget joint probability query selected by setting the type="joint" option, which combines the target variables. For the query P(A=a,B=b|C=c), A and B are combined and conditioned on C=c.
 
 """
-function bne(query::String, data::String="BN.data", header::String="BN.header"; algo="sm", scoring_method="BIC",  bootstrap=0, impute::Bool=false, iterate::String="", minfreq::Float64=0.00, verbose::Bool=false, relrisk::Bool=false, rr_bootstrap::Int64=100, bootstrap_method::String="resample", bootout="",  DAG::Bool=false, plot::String="net", boot_plot::Bool=false, nolimit::Bool=false, confmeth::String="empirical", plotmethod::Symbol=:stress, rrrdenom::Array=[], type="conditional", showhist::Bool=false)
+function bne(query::String, data::String="BN.data", header::String="BN.header"; algo="sm", scoring_method="BIC",  bootstrap=0, impute::Bool=false, iterate::String="", minfreq::Float64=0.00, verbose::Bool=false, relrisk::Bool=false, rr_bootstrap::Int64=100, bootstrap_method::String="resample", bootout="",  DAG::Bool=false, plot::String="net", boot_plot::Bool=false, nolimit::Bool=false, confmeth::String="empirical", plotmethod::Symbol=:stress, rrrdenom::Array=[], type="conditional", showhist::Symbol=:null)
 
     #query parser now replaces the f,fs,g,gs manual input
     atargs, aconds, f, fs, g, gs = queryparser(query)
@@ -99,6 +99,10 @@ function bne(query::String, data::String="BN.data", header::String="BN.header"; 
         println("Found input files BN.data, BN.header...")
     else
         error("\n\nCan't find input files!\nPlease use format_file to format your data!\n\n")
+    end
+
+    if length(atargs) == 1 && type == "joint"
+        error("\n\nUse type=\"joint\" for multi-target queries.\n")
     end
     
     if length(iterate) > 0
@@ -195,11 +199,6 @@ function bne(query::String, data::String="BN.data", header::String="BN.header"; 
     gnx = "dfcleaned[.&($gn), :]"
     qgx = "dfcleaned[.&($qn, $gn), :]"
 
-#    gnx = replace.(gnx, "1" => "\"1\"", "2" => "\"2\"",  "3" => "\"3\"", "4" => "\"4\"", "5" => "\"5\"", "6" => "\"6\""   ) 
-#    qgx = replace.(qgx, "1" => "\"1\"", "2" => "\"2\"",  "3" => "\"3\"", "4" => "\"4\"", "5" => "\"5\"", "6" => "\"6\""   ) 
- #   println("$gnx")
- #   println("$qgx")
-
     global dfcleaned
 
     condc_all = size(eval(Meta.parse(gnx)), 1)
@@ -277,11 +276,11 @@ function bne(query::String, data::String="BN.data", header::String="BN.header"; 
         @suppress R"rownames(dadjm) <- vars; colnames(dadjm) <- vars" #label DAG matrix
     end
     
-    smooth = 1/size(dfcleaned, 1)      #set smooth to reflect dataset size
+    smooth = 1/size(dfcleaned, 1)      #set smooth on dataset size
 
-    @suppress R"df = read.csv(file = $data, sep = ' ')"      # get data table
-    @suppress R"colnames(df) <- vars"                        # label data table
-    @suppress R"ecpt <- extractCPT(df, dadjm, smooth=$smooth)"  # gRain extract list of CPTs and smooth the NaNs  
+    @suppress R"df = read.csv(file = $data, sep = ' ')"    # data table
+    @suppress R"colnames(df) <- vars"                      # label data table
+    @suppress R"ecpt <- extractCPT(df, dadjm, smooth=$smooth)"  # gRain extract list of CPTs, smooth the NaNs  
     @suppress R"pt <- compileCPT(ecpt)"                      # compile with gRain
     @suppress R"pnet <- grain(pt, smooth=$smooth)"           # make net compiled, smooth
     @suppress R"pnet <- propagate(pnet)"                     # make net propagated
@@ -303,9 +302,9 @@ function bne(query::String, data::String="BN.data", header::String="BN.header"; 
     else
         ff = f
     end
-    
+
     mbM, mbnames = get_markov_blanket(adjM, dagcolnames, ff)
-    
+
     if plot == "mb" && sum(mbM) < 1        
         error("\n\nA Markov blanket for $f was not found current network variables.\nPlease set plot=\"net\" or try using other variables.\n\n")
     elseif plot == "net" && sum(adjM) == 0
@@ -315,7 +314,7 @@ function bne(query::String, data::String="BN.data", header::String="BN.header"; 
     if plot == "mb"
         mb_plt = plot_network(mbM, headerfile="BN.header", fnode=ff, gnodes=g, DAG=DAG, method=plotmethod )
         println("Displaying Markov blanket plot of $ff ...")
-        println("Nodes for minimal Markov blanket...")
+        println("Listing Markov blankets including target node...")
 
         for i in eachindex(ff)
             mbl = join(mbnames[i], ",")
@@ -332,9 +331,10 @@ function bne(query::String, data::String="BN.data", header::String="BN.header"; 
     else
         println("Plot must be either net (entire net) or mb (Markov blanket of target) or skip.")
     end
- 
+
     nodevals = rcopy(Int.(R"get.most.probable.values(net, prev.values = NULL)")) 
     nv = Dict(zip(vars, (nodevals)))
+
     #println("List of most probable state for each node...")
     #for (k,v) in nv
     #    print(k, ":", v, ";  ")
@@ -369,6 +369,13 @@ function bne(query::String, data::String="BN.data", header::String="BN.header"; 
     mc = 1
     
     println(line)
+
+    if type == "marginal"
+        println("Marginal probabilities listed as percents in table...done.")
+        return nothing, nothing, nothing, nothing, nothing, nothing
+    end
+    
+
     println("Calculating probabilities...")
 
     if iterate == "all"
@@ -379,7 +386,7 @@ function bne(query::String, data::String="BN.data", header::String="BN.header"; 
         end
         
         if length(vars) > 12
-            error("Final variable count is >12.\nConsider only the key variables to iterate over\nto complete in reasonable time!")
+            error("Final variable count is >12.\nConsider only the key variables to iterate over\n in order to complete calculations in reasonable time!")
         end
         
         if length(f) == 0
@@ -399,7 +406,7 @@ function bne(query::String, data::String="BN.data", header::String="BN.header"; 
                 continue
             end
 
-            probout, jpout = ConProb(; f=f, fs=fs, g=g, gs=gs, vars=vars, verbose=verbose, rr_bootstrap=0, type=type, query=query)
+            probout, jpout, gr_idx = ConProb(; f=f, fs=fs, g=g, gs=gs, vars=vars, verbose=verbose, rr_bootstrap=0, type=type, query=query)
             proball[mc] = jpout
             mc += 1
             probout2 = probout
@@ -433,7 +440,7 @@ function bne(query::String, data::String="BN.data", header::String="BN.header"; 
                 continue
             end
             
-            probout, jpout = ConProb(; f=f, fs=fs, g=g, gs=gs, vars=vars, verbose=verbose, rr_bootstrap = 0, type=type, query=query)
+            probout, jpout, gr_idx = ConProb(; f=f, fs=fs, g=g, gs=gs, vars=vars, verbose=verbose, rr_bootstrap = 0, type=type, query=query)
             proball[mc] = jpout
             mc += 1
             probout2 = probout 
@@ -453,7 +460,6 @@ function bne(query::String, data::String="BN.data", header::String="BN.header"; 
         fsi = parse.(Int64, fs)
         gsi = parse.(Int64, gso)
 
-
         #-----------------------------------------------
         function mtarg_freq(f, fs)  #Get multi-targ freq
 
@@ -467,6 +473,7 @@ function bne(query::String, data::String="BN.data", header::String="BN.header"; 
             qin = Meta.parse(qin)
             return qin
         end
+
         #-----------------------------------------------
         
         if typeof(f) == Vector{String}
@@ -476,22 +483,23 @@ function bne(query::String, data::String="BN.data", header::String="BN.header"; 
             mtfreq = cqin / size(dfcleaned,1)
             tpf = mtfreq    # obs. baseline freq multi-target
             println("Observed a total of $cqin samples with ", join(atargs, ", "))
-            println("Multi-target baseline frequency: ",  round(tpf, digits=6), "\n", line)
+            println("Baseline frequency of targets: ",  round(tpf, digits=6), "\n", line)
         else
             tpf = dftf[fsi] # obs. baseline freq single target
             println("Observed baseline frequency of ", join(atargs, ", "), ": ",  round(tpf, digits=6), "\n", line)
         end
-
-        probout, jpout = ConProb(; f=f, fs=fs, g=g, gs=gs, vars=vars, verbose=true, rr_bootstrap=0, type=type, query=query)
         
-        probout_o, jpout_o = ConProb(; f=f, fs=fs, g=g, gs=gso, vars=vars, verbose=false, rr_bootstrap=0, type=type, query=query);        
+        probout, jpout, gr_idx = ConProb(; f=f, fs=fs, g=g, gs=gs, vars=vars, verbose=verbose, rr_bootstrap=0, type=type, query=query)
+        
+        probout_o, jpout_o, gr_idx = ConProb(; f=f, fs=fs, g=g, gs=gso, vars=vars, verbose=false, rr_bootstrap=0, type=type, query=query);        
 
+                
         if type == "conditional" || type == "joint"
-            rrr = probout[CartesianIndex(Tuple(fsi))]
+            rrr = probout[CartesianIndex(Tuple(gr_idx))]
         
-            rro = probout_o[CartesianIndex(Tuple(fsi))]     # rr opp prob, idx still fsi!
+            rro = probout_o[CartesianIndex(Tuple(gr_idx))]     # rr opp prob, idx is from ConProb (grain)
 
-            RR = round(rrr / rro, digits=6)                 # This is the init RR est
+            RR = round(rrr / rro, digits=6)                    # This is the init RR est
 
             absrisk = round(rrr/tpf, digits=6)
 
@@ -502,11 +510,27 @@ function bne(query::String, data::String="BN.data", header::String="BN.header"; 
 
             type == "marginal" ? error("\n\nBootstrapped relative risk not implemented for $type proabilities.\n\n") : ""
 
-            println(line)
-            printstyled("Calculating relative and absolute risks with CI95 ($rr_bootstrap bootstraps) ...\n", color=:green)
+            println()
+            printstyled("Calculating relative and absolute risks with CI95 ($rr_bootstrap bootstraps)...\n", color=:green)
             
-            CI95, PRdist, RRest = bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=scoring_method, f=f, fs=fs, g=g, gs=gs, bootstrap=0, iterate="", minfreq=0.00, verbose=false, rr_bootstrap=rr_bootstrap, bootstrap_method=bootstrap_method, boot_plot=boot_plot, confmeth=confmeth, rrrdenom=rrrdenom, type=type, query=query, targc_all=targc_all)
+            CI95, PRdist, RRest, bM, RRdist = bne_bootstrap(data, header; impute=false, algo=algo, scoring_method=scoring_method, f=f, fs=fs, g=g, gs=gs, bootstrap=0, iterate="", minfreq=0.00, verbose=verbose, rr_bootstrap=rr_bootstrap, bootstrap_method=bootstrap_method, boot_plot=boot_plot, confmeth=confmeth, rrrdenom=rrrdenom, type=type, query=query, targc_all=targc_all)
 
+            if verbose == true
+
+                bMc = countmap(bM)
+                bMcs = sort(collect(bMc), by = tuple -> last(tuple), rev=true)[1:2]
+                println()
+                println("Original net and top two resampled networks...")
+                println(0, "\t", adjM, "\t", "net", "\t% match") 
+
+                for i in keys(bMcs)
+
+                    psim =  round((sum(adjM .== Matrix(bMcs[i][1])) / length(adjM)) * 100, digits=2)
+                    println(i, "\t", Matrix(bMcs[i][1]), "\t",  bMcs[i][2], "/", rr_bootstrap, "\t", psim)
+                end
+
+            end
+            
             ARdist  = sort(PRdist ./ tpf)
 
             if (confmeth == "t-dist")
@@ -569,7 +593,7 @@ function bne(query::String, data::String="BN.data", header::String="BN.header"; 
             printstyled("    Bootstrap Relative Risk Distribution:   $RRest  CI95 $CI95\n\n", color=:cyan)
 
             bpad = 0.1
-            ARlowerb = ARlower - (ARlower * bpad) 
+            ARlowerb = ARlower - (ARlower * bpad)  #These are the warning cutoffs 
             ARupperb = ARupper + (ARupper * bpad)
             RRlowerb = CI95[1] - (CI95[1] * bpad)
             RRupperb = CI95[2] + (CI95[2] * bpad)
@@ -583,18 +607,22 @@ function bne(query::String, data::String="BN.data", header::String="BN.header"; 
                     printstyled("WARNING: RRR network risk estimate is >10 percent\n         outside the resampling risk distribution.\n\n", color=:yellow)
                 end
                 
-                printstyled("This can be due to unstable network structure, small sample sizes and\nlow frequency variables. Please consider node selection, sample size,\nvariable frequency, and the probability query. Set showhist=true to display bootstrap estimates\nTarget and conditional counts were $targc_all and $condc_all.\n", color=:yellow)
+                printstyled("This result can be due to small sample sizes, unstable resampling networks,\nand low frequency variables. Please consider node selection, sample size,\nvariable frequency, and the probability query. Set showhist=true\nto display bootstrap estimates.\nFinal target and conditional counts were: $targc_all, $condc_all.\n", color=:yellow)
                             
             end
             
-            if showhist == true
-                if rr_bootstrap >= 100
-                    pltARR = histogram(ARdist, bins=50, xlabel="Absolute risk ratio\n($rr_bootstrap resampled estimates)", label="ARR" )
-                    pltARR = vline!([1.0], color=:black, style=:dash, label="1.0") 
-                    display(pltARR)
-                else
-                    println("Please use at least 2000 bootstraps for histogram display...")
-                end
+            if showhist == :ARR
+                pltARR = histogram(ARdist, bins=50, xlabel="Absolute risk ratio\n($rr_bootstrap resampled estimates)", label="ARR", color=:green )
+                pltARR = vline!([ARest], color=:red, style=:solid, label="ARR (median)")
+                pltARR = vline!([ARlower, ARupper], color=:black, style=:dash, label="CI95")
+                display(pltARR)
+            end
+
+            if showhist == :RRR
+                pltRRR = histogram(RRdist, bins=50, xlabel="Relative risk ratio\n($rr_bootstrap resampled estimates)", label="RRR" )
+                pltRRR = vline!([RRest], color=:red, style=:solid, label="RRR (median)")
+                pltRRR = vline!([CI95[1], CI95[2]], color=:black, style=:dash, label="CI95")
+                display(pltRRR)
             end
             
             println(line)
@@ -640,13 +668,20 @@ function bne(query::String, data::String="BN.data", header::String="BN.header"; 
     if typeof(f) == Vector{String}  #if complex target don't write file for more analysis
 
         fsn = Vector(parse.(Int64,fs))
-        pF = round(probout2[CartesianIndex(Tuple(fsn))], digits=4)
+        pF = round(probout2[CartesianIndex(Tuple(gr_idx))], digits=4)
 
         if type == "joint"  # clarify conditional multi-targets results  
             type = type * " target"
         end
 
-        printstyled("Network $type probability estimate of\n$query = $pF\n", color=:green)
+        if relrisk==false
+            printstyled("Network $type probability estimate of\n$query = $pF\n", color=:green)
+        end
+        
+        if type=="conditional"
+            println("\n    Caution: results from multiple target conditional propagation.\n    Use type=\"joint\" for a typical multiple target conditional query.")
+        end
+
         println(line)
         
         h = [:Targets, :ProbabilityMatrix, :ConditionalVariable, :ConditionalStates]
@@ -661,13 +696,15 @@ function bne(query::String, data::String="BN.data", header::String="BN.header"; 
     else
 
         fsn = parse(Int64,fs)
-        pF = round(probout2[CartesianIndex(Tuple(fsn))], digits=4)
+        pF = round(probout2[CartesianIndex(Tuple(gr_idx))], digits=4)
 
         if length(iterate) > 0
             println("Iteration over $iterate complete.")
         else
-            printstyled("Network $type estimate of\n$query = $pF\n", color=:teal)
-            println(line)
+            if relrisk == false
+                printstyled("Network $type estimate of\n$query = $pF\n", color=:teal)
+                println(line)
+            end
         end
         
         header = ["Target"]     #create header for multiple states of target

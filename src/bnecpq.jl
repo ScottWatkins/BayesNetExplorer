@@ -12,7 +12,7 @@ Probabilities are estimated directly from the co-occurence of events in the data
         outfile          Output file (appendable)               ""  
         outfile2         Simple output of ARR or RRR            ""   
         bootstraps       Number of replicates                   [100]  
-        k                Laplace correction factor              [1.0]  
+        k                Correction factor                      [1/sample size]  
         mincounts        min target and conditional count flag  [1, 20]
         showids          Show target ids for query              false
         idinfo           Show additional info for target ids    ""
@@ -22,7 +22,7 @@ Probabilities are estimated directly from the co-occurence of events in the data
                          (e.g., ["Yes", "No", "Yes"])
                          default: all conditional states negated
         confmeth         Distribution model for CI95        "empirical|t-dist"
-        showhist         Display the ARR distribution            false 
+        showhist         Display the ARR/RRR distribution        :ARR | :RRR 
         binomial         Binomial test of target counts          false
         fisher           Fisher test for ARR and RRR             false
 
@@ -36,7 +36,7 @@ Example query2: cpq(df, "P(Play=Yes, Forecast=Sunny|Wind=Yes)")
 Notes: The Fisher and Binomial tests may be used initially as general guide for the interpretion of results, howevet, the underlying assumptions of variable independence is violated. Using the t-distribution is only recommend for queries with target size (e.g. < 30).
 
 """
-function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::Number=1, outfile::String="", bootstraps::Int64=0, mincounts::Array=[1,20], showids=false, outfile2::String="", rrrdenom::Array=[], confmeth="empirical", binomial::Bool=false, fisher::Bool=false, idinfo::String="", showhist::Bool=false)
+function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::Number=1, outfile::String="", bootstraps::Int64=0, mincounts::Array=[1,20], showids=false, outfile2::String="", rrrdenom::Array=[], confmeth="empirical", binomial::Bool=false, fisher::Bool=false, idinfo::String="", showhist::Symbol=:null)
 
     digits > 8 ? error("Significant digits maximum is 8 digits.") : "";
     line = "-"^72
@@ -159,12 +159,12 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
             feature = String.(ff[1])
             fstate = String.(ff[2])
 
-            if !in(fstate, df[!, feature])
+            if !in(fstate, df[!, feature]) && i == 1
                 fv = unique(df[!, feature])
                 ft = typeof(fstate)
                 printstyled("\nWARN: The feature state $fstate ($ft) was not found in $feature\nfor the query or a bootstrap query...\n", color=:yellow)
             end
-
+            
             q = q * "df." * feature * ".==" * "\"" * fstate * "\"" * ","
 
             if length(rrrdenom) > 0          # custom array for rel risk denom.
@@ -213,6 +213,7 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
         cond_c = size(dfc,1)                      # cond count no targ
         cond_c_opp = size(dfc_opp,1)              # cond count opp no targ
 
+
         if t_feat_c == 0
             bb = bb + 1
         end
@@ -229,9 +230,10 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
 
         states = length(unique(df[!, target]))
 
-
+        
         function laplace_correction(k, states, all_c, cond_c, cond_c_opp, targ_c, t_feat_c, t_feat_c_fopp)
 
+            k = k
             knorm =  k * states                     # laplace correction, norm by var states
 
             if t_feat_c == 0 || t_feat_c_fopp == 0  # lp correction of num and denom if
@@ -286,21 +288,16 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
                 error("\n\nInsufficient raw data counts using mincounts = $mincounts\nChange mincounts to run this query.\n\n")
                 
             end
-
-            if t_feat_c == 0
-                printstyled("WARN: zero final counts observed. These results are only a prediction!\n", color=:yellow)
-            end
             
             cc = cc + 1
+            println(line)
             println(line)
 
             btpval = missing
             ftpvals = [missing, missing, missing, missing, missing, missing]
 
             if all_c_cond == 0  #Exact tests: Binomial and Fisher
-
-                println("\n\nWARN: Zero conditional counts!\nSkipping exact tests for $query.\nAre the requested conditionals mutually exclusive?\n\n") 
-                
+                println("\n\nWARN: Zero conditional counts!\nSkipping exact tests for $query.\nAre the requested conditionals mutually exclusive?\n\n")                 
             else
 
                 dd = 1/10^digits
@@ -420,7 +417,7 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
         if length(rrrdenom) > 0
             println(HOUT, "##IMPORTANT: Denominator for relative risk calculations was set to $rrrdenom")
         end
-        println(HOUT, "Query\tCount\tCondCount\tcpq_ARR_est\tcpq_ARR_CI95l\tcpq_ARR_CI95u\tcpq_RRR_est\tcpq_RRR_CI95l\tcpq_RRR_CI95u\tBinomial_pval\tARR_Fisher_2t_pval\tARR_Fisher_1t_left\tARR_Fisher_1t_right\tRRR_Fisher_2t_pval\tRRR_Fisher_1t_left\tRRR_Fisher_1t_right")
+        println(HOUT, "Query\tCount\tCondCount\tcpq_ARR_est\tcpq_ARR_CI95l\tcpq_ARR_CI95u\tcpq_RRR_est\tcpq_RRR_CI95l\tcpq_RRR_CI95u\tBinomial_pval\tARR_Fisher_2t_pval\tARR_Fisher_1t_left\tARR_Fisher_1t_right\tRRR_Fisher_2t_pval\tRRR_Fisher_1t_left\tRRR_Fisher_1t_right\tFlags")
         close(HOUT)
         
         if bootstraps > 0
@@ -459,9 +456,6 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
 
                     if confmeth == "t-dist"
 
-                        #x = histogram(data)
-                        #display(x)
-                        #error("STOP")
                         N = rvals[3][1] # ν based on target count
                         N < 2 ? N = 2 : N = N # prevent ν domian error
                         
@@ -473,12 +467,6 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
                     else
                         lc = quantile(data, 0.025)
                         uc = quantile(data, 0.975)
-                    end
-
-                    if showhist == true
-                        plt = histogram(data, bins=50, xlabel="ARR score", ylabel="Observations ($bootstraps)", label="ARR estimates")
-                        vline!([e], label="ARR average ($e)", width=1.0)
-                        display(plt)
                     end
                     
                 end
@@ -493,6 +481,24 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
             lp_RRR, lp_RRRlc, lp_RRRuc = myconfint(B5, bootstraps, digits)
 
             ARR, ARRlc, ARRuc = myconfint(B2, bootstraps, digits)  #ARR last for showhist
+
+            if showhist == :ARR
+                lp_ARRlc = round(lp_ARRlc, digits = 4)
+                lp_ARRuc = round(lp_ARRuc, digits = 4)
+                plt = histogram(B3,  bins=50, xlabel="ARR score", ylabel="Estimates ($bootstraps)", label="ARR estimates")
+                vline!([lp_ARR], label="ARR average ($lp_ARR)", width=2.0) 
+                vline!([lp_ARRlc, lp_ARRuc], label="($lp_ARRlc, $lp_ARRuc)", width=1.0, linestyle=:dash)
+                display(plt)
+            end
+
+            if showhist == :RRR
+                lp_RRRlc = round(lp_RRRlc, digits = 4)
+                lp_RRRuc = round(lp_RRRuc, digits = 4)
+                plt = histogram(B5, bins=50,  xlabel="RRR score", ylabel="Estimates ($bootstraps)", label="RRR estimates")
+                vline!([lp_RRR], label="RRR average ($lp_RRR)", width=2.0) 
+                vline!([lp_RRRlc, lp_RRRuc], label="($lp_RRRlc, $lp_RRRuc)", width=1.0, linestyle=:dash)
+                display(plt)
+            end
             
             if cc == bootstraps + 1
 
@@ -505,16 +511,20 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
                 
                 if bb > 0
                     println("WARN: $bb/$bootstraps bootstraps had zero counts but were corrected.")
-                    println("-"^70)
+                    println(line)
                 end
                 
+                println()
+                println("-"^55)
                 println("Distribution average and CI95 for $bootstraps bootstraps")
-                println("-"^70)
+                println("-"^55)
                 println("Abs risk        $TF($TFlc, $TFuc)")
                 println("ARR             $lp_ARR($lp_ARRlc, $lp_ARRuc)")
                 println("RRR             $lp_RRR($lp_RRRlc, $lp_RRRuc)")
-                println("-"^70)
-
+                println("-"^55)
+                println()
+                println(line)
+                
                 if (length(outfile) > 0) || (length(outfile2) > 0)
 
                     targraw     = rvals[2][1]
@@ -594,7 +604,7 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
                         rrrb = ftpvals[4]; rrrl = ftpvals[5]; rrrr = ftpvals[6]
 
                         OUT = open(outfile, "a")
-                        println(OUT, "$query\t$t_c_adj\t$a_c_adj\t$lp_ARR\t$lp_ARRlc\t$lp_ARRuc\t$lp_RRR\t$lp_RRRlc\t$lp_RRRuc\t$btpval\t$arrb\t$arrl\t$arrr\t$rrrb\t$rrrl\t$rrrr")
+                        println(OUT, "$query\t$t_c_adj\t$a_c_adj\t$lp_ARR\t$lp_ARRlc\t$lp_ARRuc\t$lp_RRR\t$lp_RRRlc\t$lp_RRRuc\t$btpval\t$arrb\t$arrl\t$arrr\t$rrrb\t$rrrl\t$rrrr\t$badflag")
                         close(OUT)
 
                     end
@@ -613,9 +623,10 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
                         close(OUT2)
                     end
                     
-                end
-                
+                end 
+               
             end
+
         end
 
     end            # end bnecpqbootstrap
