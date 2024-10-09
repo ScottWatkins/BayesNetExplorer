@@ -22,7 +22,6 @@ Analyze a square matrix of correlations in an input dataframe (row and columns l
 """
 function correlation_analyzer(df_r::DataFrame, num_samples::Int64; pmax::Float64=0.05, rmin::Float64=0.7, tails::Int64=2, title::String="", cbtitle::String="Correlation", fontsize=6)
 
-    
     cbtitle = "\n" * cbtitle
     n = names(df_r)
     M = Matrix(df_r[:, 2:end])
@@ -76,8 +75,8 @@ function correlation_analyzer(df_r::DataFrame, num_samples::Int64; pmax::Float64
                   
                     )
 
-    vglines = collect(1:1:(size(MM,1) - 1)) .+ 0.472
-    hglines = collect(1:1:(size(MM,1) - 1)) .+ 0.52
+    vglines = collect(1:1:(size(MM,1) - 1)) .+ 0.5 #tweak for large matrix
+    hglines = collect(1:1:(size(MM,1) - 1)) .+ 0.5 #tweak for large matrix
     vline!(vglines, label="", color=:grey50, alpha=0.5)
     hline!(hglines, label="", color=:grey50, alpha=0.5)
     # Note j and i are flipped to match flip_y above!!

@@ -3,9 +3,9 @@
 
 Calculate an outcome probablity for the event Y=y given one or more conditional variables X1, X2, ... Xn from some body of evidence X.
 
-Inputs: a csv file or dataframe and the probability query. The input data must have sample ids in column 1, and all columns must be labeled. Provide optional metatdata for samples in a separate file with sample ids in column 1.
+Inputs: a csv file/dataframe and the probability query. The input data must have sample ids in column 1, and all columns must be labeled. You may Provide optional metatdata for samples in a separate file with sample ids in column 1.
 
-Probabilities are estimated directly from the co-occurence of events in the data. The expression, P(Y=Yes|X1=Yes,X2=No), is queried as fraction of Y=Yes events in the subset of the data where X1 is Yes and X2 is No. Currently, only binary conditional variables are allowed. Laplace correction is use for zero count events.
+Probabilities are estimated directly from the co-occurence of events in the data. The expression, P(Y=Yes|X1=Yes,X2=No), is queried as fraction of Y=Yes events in the subset of the data where X1 is Yes and X2 is No. Currently, only binary conditional variables are allowed. A correction factor is use for zero count events.
 
     Keyword options:
         digits           Round to n digits                      [4]    
@@ -16,7 +16,7 @@ Probabilities are estimated directly from the co-occurence of events in the data
         mincounts        min target and conditional count flag  [1, 20]
         showids          Show target ids for query              false
         idinfo           Show additional info for target ids    ""
-                         Input is csv file of metadata for ids 
+                         Input: a csv file of metadata each id 
         rrrdenom         Custom rel. risk ratio coditional      []
                          states for the denominator
                          (e.g., ["Yes", "No", "Yes"])
@@ -33,7 +33,7 @@ Example query2: cpq(df, "P(Play=Yes, Forecast=Sunny|Wind=Yes)")
                 The conditional probability of Play & Sunny given Wind.
                 The Play and Forcast are merged into a single variable.
 
-Notes: The Fisher and Binomial tests may be used initially as general guide for the interpretion of results, howevet, the underlying assumptions of variable independence is violated. Using the t-distribution is only recommend for queries with target size (e.g. < 30).
+Notes: The Fisher and binomial tests may be used initially as a general guide for the interpretion of results, however, the underlying assumptions of variable independence must be considered. Using the t-distribution is only recommend for queries with target size (e.g. < 30).
 
 """
 function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::Number=1, outfile::String="", bootstraps::Int64=0, mincounts::Array=[1,20], showids=false, outfile2::String="", rrrdenom::Array=[], confmeth="empirical", binomial::Bool=false, fisher::Bool=false, idinfo::String="", showhist::Symbol=:null)
@@ -125,7 +125,6 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
     global bb = -1
 
     sinfo=[]
-
     
     function runbnecpq(df, newcols, z)
 
@@ -191,7 +190,7 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
         dfc = eval(dcall)
 
         global dfid = hcat(ids, df)
-
+        
         oc = replace(q[8:end-5], "df" => "dfid")
         qid = "dfid[.&(" * oc  * "," * "dfid." * target * ".==\"" * tstate * "\"), 1]"
         dcall = Meta.parse(qid)
@@ -306,6 +305,7 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
                     printstyled("-----------------------Binomial test of significance:-------------------\n", color=:cyan)
                     println(line)
                     bt = BinomialTest(t_feat_c, all_c_cond, parse.(Float64, targ_f))
+
                     btpval = round(pvalue(BinomialTest(t_feat_c, all_c_cond, parse.(Float64, targ_f))), digits=digits)
                     #bt95int = round.(confint(BinomialTest(t_feat_c, all_c_cond, parse.(Float64, targ_f))),  digits=digits)
                     btpval <= dd ? btpval = dd : btpval = btpval

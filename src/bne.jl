@@ -53,7 +53,7 @@ Options
 
         minfreq      min variable frequency              [0.0]
         verbose      add additional evaluation info      [false]
-        confmeth     CI95 method                      [empirical|t-dist]
+        confmeth     CI95 method                         [empirical|t-dist]
         rrrdenom     specify target states for the       []
                      relative risk ratio denominator.
                      Default: all query states negated.

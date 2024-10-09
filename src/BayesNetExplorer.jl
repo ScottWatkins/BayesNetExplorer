@@ -32,6 +32,7 @@ export getRRtablerows
 export Colors
 export forestplot
 export merge_bne_cpq
+export bne_cor
 
 include("impute_dataframe.jl")
 include("format_file.jl")
@@ -65,5 +66,6 @@ include("TwoSampleZtest.jl")
 include("forestplot.jl")
 include("benjhoc.jl")
 include("merge_bne_cpq.jl")
+include("bne_cor.jl")
 
 end
