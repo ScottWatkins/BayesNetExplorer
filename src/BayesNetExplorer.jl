@@ -33,6 +33,7 @@ export Colors
 export forestplot
 export merge_bne_cpq
 export bne_cor
+export showcodes
 
 include("impute_dataframe.jl")
 include("format_file.jl")
@@ -67,5 +68,6 @@ include("forestplot.jl")
 include("benjhoc.jl")
 include("merge_bne_cpq.jl")
 include("bne_cor.jl")
+include("showcodes.jl")
 
 end

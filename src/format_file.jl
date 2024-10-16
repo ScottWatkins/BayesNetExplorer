@@ -1,7 +1,7 @@
 """
     df, ids, features = format_file(datafile; datacols=[], delim=",", minfreq=0.0, recode_bool=false)
 
-Create and format variables to be used in the network from a user provided data table. Write data and header files to disk (BN.data, BN.header). Write variable map file to disk (recode.map). The user input table *must* be text based unless it contains strictly boolean variables coded as 0/1 or true/false.
+Create and format variables to be used in the network from a user provided data table. Write data and header files to disk (BN.data, BN.header). Write a variable map file to disk (recode.map). The user input table *must* be text based unless it contains strictly boolean variables coded as 0/1 or true/false.
 
 The input data must be a full matrix with observations in rows and features in columns. Observations and features must be fully labeled.  Features must be discrete or quantized variables. 
 

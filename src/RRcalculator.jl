@@ -1,7 +1,7 @@
 """
     RRcalculator(dfp::DataFrame; target_state::String, target_state_freq::Float64, variable_table::DataFrame=vt, mincounts::Vector=[0,1], minp::Float=0.0, maxp::Float=1.0)
 
-Calculate the relative and absolute risk ratios from a probability table generated with the bne iterate function. Process and sort all targets and target conditions. Users may apply filters to focus the results from a large probability space .
+Calculate the relative and absolute risk ratios from a probability table generated with the bne iterate function. Process and sort all targets and target conditions. Users may apply filters to focus the results from a large probability space.
 
 **Input variables, dfp, target_state_freq, and variable_table are from the output of the bne() run.**
 

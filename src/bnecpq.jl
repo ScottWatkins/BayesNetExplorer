@@ -3,7 +3,7 @@
 
 Calculate an outcome probablity for the event Y=y given one or more conditional variables X1, X2, ... Xn from some body of evidence X.
 
-Inputs: a csv file/dataframe and the probability query. The input data must have sample ids in column 1, and all columns must be labeled. You may Provide optional metatdata for samples in a separate file with sample ids in column 1.
+Inputs: a csv file or a dataframe and the probability query. The input data must have sample ids in column 1, and all columns must be labeled. You may Provide optional metatdata for samples in a separate file with sample ids in column 1. All input will be converted to strings.
 
 Probabilities are estimated directly from the co-occurence of events in the data. The expression, P(Y=Yes|X1=Yes,X2=No), is queried as fraction of Y=Yes events in the subset of the data where X1 is Yes and X2 is No. Currently, only binary conditional variables are allowed. A correction factor is use for zero count events.
 
@@ -33,17 +33,17 @@ Example query2: cpq(df, "P(Play=Yes, Forecast=Sunny|Wind=Yes)")
                 The conditional probability of Play & Sunny given Wind.
                 The Play and Forcast are merged into a single variable.
 
-Notes: The Fisher and binomial tests may be used initially as a general guide for the interpretion of results, however, the underlying assumptions of variable independence must be considered. Using the t-distribution is only recommend for queries with target size (e.g. < 30).
+Notes: The Fisher and binomial tests may be used as a general guide for the interpretion of results. The underlying assumption of variable independence are often violated. Using the t-distribution is only recommend for queries with small target counts of < 30.
 
 """
-function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::Number=1, outfile::String="", bootstraps::Int64=0, mincounts::Array=[1,20], showids=false, outfile2::String="", rrrdenom::Array=[], confmeth="empirical", binomial::Bool=false, fisher::Bool=false, idinfo::String="", showhist::Symbol=:null)
+function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::Number=1, outfile::String="", bootstraps::Int64=0, mincounts::Array=[1,20], showids=false, outfile2::String="", rrrdenom::Array=[], confmeth="empirical", binomial::Bool=false, fisher::Bool=false, idinfo::String="", showhist::Symbol=:null, delim=",")
 
     digits > 8 ? error("Significant digits maximum is 8 digits.") : "";
     line = "-"^72
     println(line)
     
     z = queryparser(query)
-
+    
     newcols::AbstractVector{Symbol} = []
     push!(newcols, Symbol(split(z[1][1], "=")[1]))
 
@@ -59,7 +59,6 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
         println("Using relative risk denominator states: $rrrdenom.")
     end
     
-
     if typeof(data) == DataFrame     #read data
 
         ids = data[!,1]
@@ -102,7 +101,8 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
                  
             insertcols!(data, nn => nd)
 
-        elseif length(z[4]) > 3 
+        elseif length(z[4]) > 3
+
             error("\n\nINFO: Multistate target evaluation limited to three targets!\n\n")   
         end
 
@@ -111,8 +111,9 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
     elseif isfile(data)
         
         length(z[1]) > 1 ? error("\n\nDataframe input required for multitarget query\n\n.") : nothing
-        
-        global df = CSV.read(data, DataFrame, normalizenames=true, types=String, select=newcols);
+
+
+        global df = CSV.read(data, DataFrame, normalizenames=true, types=String, select=newcols, comment="#", delim=delim)
 
         ids = df[!,1]
 
@@ -175,7 +176,7 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
             if length(fstate_opp) == 1
                 fstate_opp = fstate_opp[1]
             else
-                error("\nMore than two states in selected feature\nor input inconsisent with features and states.\n")
+                error("\nMore than two states in selected feature\nOR user input was inconsisent with features and states.\n")
             end
 
             q_opp = q_opp * "df." * feature * ".==" * "\"" * fstate_opp * "\"" * ","

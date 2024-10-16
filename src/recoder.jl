@@ -15,9 +15,9 @@ function recoder(d::Union{String,DataFrame}; recode12::Bool=false, recode_bool::
         println("Reading data from file: $d")
 
         if recode_bool == true || recode12 == true
-            d = CSV.read(d, DataFrame, delim=delim)
+            d = CSV.read(d, DataFrame, delim=delim, comment="#")
         else
-            d = CSV.read(d, DataFrame, delim=delim, types=String)
+            d = CSV.read(d, DataFrame, delim=delim, types=String, comment="#")
         end
     end
 
