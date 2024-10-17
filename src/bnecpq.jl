@@ -3,7 +3,7 @@
 
 Calculate an outcome probablity for the event Y=y given one or more conditional variables X1, X2, ... Xn from some body of evidence X.
 
-Inputs: a csv file or a dataframe and the probability query. The input data must have sample ids in column 1, and all columns must be labeled. You may Provide optional metatdata for samples in a separate file with sample ids in column 1. All input will be converted to strings.
+Inputs: a csv file or a dataframe and the probability query. The input data must have sample ids in column 1, and all columns must be labeled. You may provide optional metatdata for samples in a separate file with sample ids in column 1. All input will be converted to strings.
 
 Probabilities are estimated directly from the co-occurence of events in the data. The expression, P(Y=Yes|X1=Yes,X2=No), is queried as fraction of Y=Yes events in the subset of the data where X1 is Yes and X2 is No. Currently, only binary conditional variables are allowed. A correction factor is use for zero count events.
 
@@ -38,6 +38,8 @@ Notes: The Fisher and binomial tests may be used as a general guide for the inte
 """
 function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::Number=1, outfile::String="", bootstraps::Int64=0, mincounts::Array=[1,20], showids=false, outfile2::String="", rrrdenom::Array=[], confmeth="empirical", binomial::Bool=false, fisher::Bool=false, idinfo::String="", showhist::Symbol=:null, delim=",")
 
+    data = copy(data)
+    
     digits > 8 ? error("Significant digits maximum is 8 digits.") : "";
     line = "-"^72
     println(line)
@@ -58,12 +60,13 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
         end
         println("Using relative risk denominator states: $rrrdenom.")
     end
-    
+
     if typeof(data) == DataFrame     #read data
 
         ids = data[!,1]
         nn = join(z[3], "")
         length(z[1]) > 1 ? push!(newcols, Symbol(nn)) : nothing
+
         
         if length(z[1]) > 1 && !in(nn, names(data)) 
 
@@ -101,8 +104,8 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
                  
             insertcols!(data, nn => nd)
 
-        elseif length(z[4]) > 3
-
+        elseif typeof(z[4]) == Array && length(z[4]) > 3
+            
             error("\n\nINFO: Multistate target evaluation limited to three targets!\n\n")   
         end
 
@@ -111,7 +114,6 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
     elseif isfile(data)
         
         length(z[1]) > 1 ? error("\n\nDataframe input required for multitarget query\n\n.") : nothing
-
 
         global df = CSV.read(data, DataFrame, normalizenames=true, types=String, select=newcols, comment="#", delim=delim)
 
@@ -229,7 +231,6 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
         # states of the target state.
 
         states = length(unique(df[!, target]))
-
         
         function laplace_correction(k, states, all_c, cond_c, cond_c_opp, targ_c, t_feat_c, t_feat_c_fopp)
 
@@ -644,6 +645,7 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
     arr = parse.(Float64, string.(strip(rvals[1][3]) ))
     rrr = parse.(Float64, string.(strip(rvals[1][5]) ))
 
+    data = []
     return arr, rrr, fids, sinfo, rvals[3][1]   #rval[3][1] is final counts
     
 end
