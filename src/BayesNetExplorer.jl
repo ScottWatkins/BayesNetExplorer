@@ -1,9 +1,9 @@
 module BayesNetExplorer
 
-#println("Welcome to BayesNetExplorer v0.3.5\n")
-#println("This package is under active development.\nFeedback and bug reports are appreciated!\n[scott.watkins@utah.edu]\n")
-#println("Loading the package and all dependencies ...")
-#println("Exporting user functions ...")
+# Welcome to BayesNetExplorer v0.5.1
+# This package is under active development.
+# Please send comments, bug reports, and feature
+# requests to scott.watkins@genetics.utah.edu.
 
 using CSV, DataFrames, DelimitedFiles
 using StatsBase, Statistics, Random, Distributions, Combinatorics
@@ -11,6 +11,7 @@ using HypothesisTests
 using Plots, GraphRecipes, RCall, Suppressor, Glob
 using LinearAlgebra, Impute
 using OhMyREPL, Colors, Printf
+using LibPQ, Tables
 
 export CSV
 export DataFrames
@@ -34,9 +35,11 @@ export forestplot
 export merge_bne_cpq
 export bne_cor
 export showcodes
+export import_psql
 
 include("impute_dataframe.jl")
 include("format_file.jl")
+include("import_psql.jl")
 include("feature_selector.jl")
 include("bne.jl")
 include("run_bnlearn.jl")
