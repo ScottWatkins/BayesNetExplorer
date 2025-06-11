@@ -3,17 +3,17 @@
 names = []
 OUT = open("dat.tmp", "w")
 OUT2 = open("head.tmp", "w")
+
 open(ARGS[1]) do f
     k = 0
     m = 0
- #   mflag = []
-    
+
     for i in eachline(f)
         if occursin(r"^#A", i)
 
             b = split(i, "\t")
             c = replace(b[14], r"" => ",", count=length(b[14]))
-            d = join([b[4],c], "")
+            d = join([b[4], c], "")
 #            TRU = parse(Int, b[8])
 #            d = join([d,TRU], ",")
 
@@ -22,8 +22,9 @@ open(ARGS[1]) do f
 #            end        
 
             k = k + 1
-            id = "ID" * string(k) * ","
-            println(OUT, id, d)
+#            id = "ID" * string(k) * ","
+            id = string(b[3])
+            println(OUT, id, ",", d)
         end
 
         if occursin(r"^#O", i)

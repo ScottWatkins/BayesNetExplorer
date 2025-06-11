@@ -40,19 +40,19 @@ function format_file(infile::Union{String,DataFrame}; datacols::Array=[], delim:
     end
 
     df, rmap = recoder(infile; recode_bool=recode_bool, recode12=recode12, delim=delim)
-
+println(names(df))
     ids = df[:,1]
     dfc = size(df,2)
 
     BN = df
     col1 = Symbol(names(df)[1])
-    
+    #println("==>", col1)
     if length(datacols) > 0
 
         if in(1, datacols) || in(Symbol(names(df)[1]), datacols)
             println("Selected data includes the labels column...")
         else
-            error("\n\nPlease always include the first column, :$col1, and don't exceed column $dfc !\n\n")
+            error("\n\nRemember to always include the first column, don't exceed column the total columns in this dataframe ($dfc), and use recode_bool=true if the input file is strictly 0/1 variables.\n\n")
         end
         
         BN = select(df, datacols)

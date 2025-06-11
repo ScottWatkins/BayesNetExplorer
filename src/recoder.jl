@@ -15,10 +15,14 @@ function recoder(d::Union{String,DataFrame}; recode12::Bool=false, recode_bool::
         println("Reading data from file: $d")
 
         if recode_bool == true || recode12 == true
-            d = CSV.read(d, DataFrame, delim=delim, comment="#")
+            d = CSV.read(d, DataFrame, delim=delim, comment="#", normalizenames=true)
         else
-            d = CSV.read(d, DataFrame, delim=delim, types=String, comment="#")
+            d = CSV.read(d, DataFrame, delim=delim, types=String, comment="#", normalizenames=true)
         end
+    end
+
+    if size(d, 2) > 300 
+        printstyled("Warning: input data has more than 300 variables. Consider preselecting column for better speed!\n", color=:yellow)
     end
 
     col1name = Symbol(names(d)[1])

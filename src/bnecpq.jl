@@ -8,11 +8,11 @@ Inputs: a csv file or a dataframe and the probability query. The input data must
 Probabilities are estimated directly from the co-occurence of events in the data. The expression, P(Y=Yes|X1=Yes,X2=No), is queried as fraction of Y=Yes events in the subset of the data where X1 is Yes and X2 is No. Currently, only binary conditional variables are allowed. A correction factor is use for zero count events.
 
     Keyword options:
-        digits           Round to n digits                      [4]    
+        digits           Round to n digits                      4    
         outfile          Output file (appendable)               ""  
         outfile2         Simple output of ARR or RRR            ""   
-        bootstraps       Number of replicates                   [100]  
-        k                Correction factor                      [1/sample size]  
+        bootstraps       Number of replicates                   0  
+        k                Correction factor                      1/sample size  
         mincounts        min target and conditional count flag  [1, 20]
         showids          Show target ids for query              false
         idinfo           Show additional info for target ids    ""
@@ -33,12 +33,12 @@ Example query2: cpq(df, "P(Play=Yes, Forecast=Sunny|Wind=Yes)")
                 The conditional probability of Play & Sunny given Wind.
                 The Play and Forcast are merged into a single variable.
 
-Notes: The Fisher and binomial tests may be used as a general guide for the interpretion of results. The underlying assumption of variable independence are often violated. Using the t-distribution is only recommend for queries with small target counts of < 30.
+Notes: The Fisher and Binomial tests may be used as a general guide for the interpretion of results. The Fisher test may fail with certain count combinations. The underlying assumption of variable independence are often violated. Using the t-distribution is only recommend for queries with small target counts of < 30.
 
 """
 function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::Number=1, outfile::String="", bootstraps::Int64=0, mincounts::Array=[1,20], showids=false, outfile2::String="", rrrdenom::Array=[], confmeth="empirical", binomial::Bool=false, fisher::Bool=false, idinfo::String="", showhist::Symbol=:null, delim=",")
 
-    data = copy(data)
+    data = copy(data)    
     
     digits > 8 ? error("Significant digits maximum is 8 digits.") : "";
     line = "-"^72
@@ -66,7 +66,6 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
         ids = data[!,1]
         nn = join(z[3], "")
         length(z[1]) > 1 ? push!(newcols, Symbol(nn)) : nothing
-
         
         if length(z[1]) > 1 && !in(nn, names(data)) 
 
@@ -91,6 +90,7 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
                 end
 
             else
+
             end
 
             nd = string.(nd)
@@ -110,7 +110,7 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
         end
 
         df = select(data, newcols)
-
+        
     elseif isfile(data)
         
         length(z[1]) > 1 ? error("\n\nDataframe input required for multitarget query\n\n.") : nothing
@@ -123,7 +123,7 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
         error("\nCannot find file or dataframe called $data.\n")
     end
 
-    global dfg = df  #MUST set a global dataframe here for resampling with eval!!!
+    global dfg = df[:,:]  #MUST set a global dataframe here for resampling with eval!!!
     global cc = 0
     global bb = -1
 
@@ -178,7 +178,7 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
             if length(fstate_opp) == 1
                 fstate_opp = fstate_opp[1]
             else
-                error("\nMore than two states in selected feature\nOR user input was inconsisent with features and states.\n")
+                error("\nMore than two states in selected feature\nOR user input was inconsisent with features and states.\nAre all dataframe columns of type String?\n(df = string.(df) to set all cols to string type).\n\n")
             end
 
             q_opp = q_opp * "df." * feature * ".==" * "\"" * fstate_opp * "\"" * ","
@@ -215,6 +215,7 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
         cond_c = size(dfc,1)                      # cond count no targ
         cond_c_opp = size(dfc_opp,1)              # cond count opp no targ
 
+        frqcond_c = cond_c/size(df,1)             # frq of cond no targ
 
         if t_feat_c == 0
             bb = bb + 1
@@ -275,14 +276,21 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
 
             targ_f, t_feat_f, lp_t_feat_f,  t_feat_f_fopp, lp_t_feat_f_fopp = rpad.(printformat.(round.((targ_f, t_feat_f, lp_t_feat_f, t_feat_f_fopp, lp_t_feat_f_fopp ), digits=digits), fmt=fmt), 10)
             
-            abs_risk_ratio, lp_abs_risk_ratio = rpad.(printformat.(round.((abs_risk_ratio,lp_abs_risk_ratio), digits=digits), fmt=fmt), 10)
+            ARRimpact = abs_risk_ratio * frqcond_c   # impact: ARR * cond freq
+            RRRimpact = rel_risk_ratio * frqcond_c   # impact: RRR * cond freq
+
+            abs_risk_ratio, lp_abs_risk_ratio, ARRimpact = rpad.(printformat.(round.((abs_risk_ratio,lp_abs_risk_ratio, ARRimpact), digits=digits), fmt=fmt), 8)
             
-            rel_risk_ratio, lp_rel_risk_ratio = rpad.(printformat.(round.((rel_risk_ratio,lp_rel_risk_ratio), digits=digits), fmt=fmt), 10)
+            rel_risk_ratio, lp_rel_risk_ratio, RRRimpact = rpad.(printformat.(round.((rel_risk_ratio,lp_rel_risk_ratio, RRRimpact), digits=digits), fmt=fmt), 8)
+
+
             println(line)
             println("Counts:\n\tTarget (all)\t\t$targ_c\n\tTarget|Conditionals\t$t_feat_c\tConditionals only\t$all_c_cond\n\tTarget|!Conditionals\t$t_feat_c_fopp\t!Conditionals only\t$all_c_opp\n" )   
             println("Probabilities:\n  Absolute risk (baseline)\t$targ_f\n  Targets|Conditionals          $t_feat_f\t$lp_t_feat_f (adj)\n  Targets|!Conditionals         $t_feat_f_fopp\t$lp_t_feat_f_fopp (adj)\n")    
-            println("Risk ratios:\n  ARR:\t$abs_risk_ratio\tARR (adj):\t$lp_abs_risk_ratio")
-            println( "  RRR:\t$rel_risk_ratio \tRRR (adj):\t$lp_rel_risk_ratio")
+            println("Risk ratios:\n  ARR:\t$abs_risk_ratio\tARR (adj):\t$lp_abs_risk_ratio\tImpact: $ARRimpact")
+            println( "  RRR:\t$rel_risk_ratio \tRRR (adj):\t$lp_rel_risk_ratio\tImpact: $RRRimpact")
+            
+
             
             if (t_feat_c < mincounts[1] || all_c_cond < mincounts[2]) || (t_feat_c_fopp < mincounts[1] || all_c_opp < mincounts[2])
                 println(line)
@@ -304,7 +312,7 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
                 dd = 1/10^digits
 
                 if binomial == true
-                    printstyled("-----------------------Binomial test of significance:-------------------\n", color=:cyan)
+                    printstyled("-----------------------Binomial test of significance--------------------\n", color=:cyan)
                     println(line)
                     bt = BinomialTest(t_feat_c, all_c_cond, parse.(Float64, targ_f))
 
@@ -318,14 +326,13 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
                 
                 if fisher == true
                 
-                    printstyled("---------------- Absolute risk ratio: Fisher evaluation ----------------\n", color=:green)
+                    printstyled("-----------------Absolute risk ratio: Fisher evaluation-----------------\n", color=:green)
                     println(line)
                     
                     numall = all_c_cond - t_feat_c 
                     arrdenom = all_c - targ_c
                     
                     arrft = FisherExactTest(t_feat_c, targ_c, numall, arrdenom);
-
                     arrpvall = round(pvalue(FisherExactTest(t_feat_c, targ_c, numall, arrdenom), tail=:left ), digits=digits)
                     arrpvalr = round(pvalue(FisherExactTest(t_feat_c, targ_c, numall, arrdenom), tail=:right ), digits=digits)
                     arrpvalb = round(pvalue(FisherExactTest(t_feat_c, targ_c, numall, arrdenom), tail=:both ), digits=digits)
@@ -397,11 +404,11 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
             end
         end
         
-        return (([targ_f abs_risk_ratio lp_abs_risk_ratio rel_risk_ratio lp_rel_risk_ratio], [targ_c, all_c], [t_feat_c cond_c], [t_feat_c_fopp, all_c_opp], [t_c_adj, a_c_adj, t_c_opp_adj, a_c_opp_adj], [tids] ) ), btpval, ftpvals
+        return (([targ_f abs_risk_ratio lp_abs_risk_ratio rel_risk_ratio lp_rel_risk_ratio], [targ_c, all_c], [t_feat_c cond_c], [t_feat_c_fopp, all_c_opp], [t_c_adj, a_c_adj, t_c_opp_adj, a_c_opp_adj], [tids] ) ), btpval, ftpvals, ARRimpact, RRRimpact
         
     end
 
-    rvals, btpval, ftpvals = runbnecpq(df, newcols, z)  # Main run
+    rvals, btpval, ftpvals, ARRimpact, RRRimpact = runbnecpq(df, newcols, z)  # Main run
 
     if rvals[3][1] > 30 && confmeth == "t-dist"
         error("\n\nFinal target count > 30  for this probability query.\nPlease use confmeth=\"empirical\"\n\n")
@@ -424,8 +431,8 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
         
         if bootstraps > 0
             
-            if bootstraps < 100
-                error("\n\nPlease use at least 100 bootstraps.\n\n")
+            if 1 < bootstraps < 100
+                printstyled("\n\nWARN: Please use at least 100 bootstraps for CI estimates!\n\n", color=:yellow)
             end
             
             B = Array{Float64, 2}(undef, bootstraps, 5)
@@ -566,10 +573,9 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
                     end
                     
                     if targcounts == 0     # flag even if mincount set to 0
-                        badflag = "Zero_raw_final_counts"
+                        badflag = "Count=0; adj to 1"
                     end
                     
-
                     for i in eachindex(clist)
 
                         if clist[i] >= mincounts[2]
@@ -597,7 +603,7 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
                     
                     if length(outfile) > 0
 
-                        if bootstraps < 1
+                        if bootstraps == 0
                             error("Bootstrapping must be used for file output.")
                         end
 
@@ -646,6 +652,6 @@ function cpq(data::Union{String,DataFrame}, query::String; digits::Int64=4, k::N
     rrr = parse.(Float64, string.(strip(rvals[1][5]) ))
 
     data = []
-    return arr, rrr, fids, sinfo, rvals[3][1]   #rval[3][1] is final counts
+    return arr, rrr, fids, sinfo, rvals[3][1], ARRimpact, RRRimpact   #rval[3][1] is final counts
     
 end

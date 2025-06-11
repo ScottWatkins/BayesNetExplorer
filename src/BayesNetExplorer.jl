@@ -7,11 +7,12 @@ module BayesNetExplorer
 
 using CSV, DataFrames, DelimitedFiles
 using StatsBase, Statistics, Random, Distributions, Combinatorics
-using HypothesisTests
+using HypothesisTests, Distances
 using Plots, GraphRecipes, RCall, Suppressor, Glob
 using LinearAlgebra, Impute
 using OhMyREPL, Colors, Printf
 using LibPQ, Tables
+using Suppressor
 
 export CSV
 export DataFrames
@@ -36,6 +37,9 @@ export merge_bne_cpq
 export bne_cor
 export showcodes
 export import_psql
+export targetmaker
+export cpqscan
+export phenomaker
 
 include("impute_dataframe.jl")
 include("format_file.jl")
@@ -72,5 +76,9 @@ include("benjhoc.jl")
 include("merge_bne_cpq.jl")
 include("bne_cor.jl")
 include("showcodes.jl")
+include("targetmaker.jl")
+include("hashfile.jl")
+include("cpqscan.jl")
+include("phenomaker.jl")
 
 end
